@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tower Defense</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- START MENU -->
+<section id="menu" class="screen">
+  <div id="menuMain" class="card">
+    <h1 id="title"></h1>
+    <p class="muted">Stop the enemies before they reach the exit.</p>
+    <button id="playBtn" class="big">Play</button>
+  </div>
+  <aside id="menuBoard" class="card">
+    <h2>Top 10</h2>
+    <table><thead><tr><th>#</th><th>Name</th><th>Wave</th><th>Score</th><th>Map</th></tr></thead><tbody id="menuBody"></tbody></table>
+  </aside>
+</section>
+
+<!-- GAME -->
+<section id="gameView" class="screen" hidden>
+  <div id="bar">
+    <b id="mapName"></b><span class="spacer"></span>
+    <button id="pauseBtn"></button><button id="speedBtn"></button><button id="autoBtn"></button>
+    <button id="restartBtn">Restart</button><button id="menuBtn">Menu</button>
+  </div>
+  <div id="game">
+    <div id="stage">
+      <canvas id="canvas"></canvas>
+      <div id="paused" class="overlay" hidden>Paused</div>
+      <div id="modal" class="overlay" hidden>
+        <div id="modalBox">
+          <h2>Game over</h2>
+          <p id="modalText"></p>
+          <input id="nameInput" maxlength="16" placeholder="Your username" autocomplete="off">
+          <button id="saveBtn">Save score and play again</button>
+          <button id="skipBtn">Play again without saving</button>
+        </div>
+      </div>
+    </div>
+    <div id="panel">
+      <div id="stats">
+        <div class="stat">Gold<b id="gold"></b></div><div class="stat">Lives<b id="lives"></b></div><div class="stat">Wave<b id="wave"></b></div>
+        <div class="stat">Enemies<b id="enemies"></b></div><div class="stat">Score<b id="score"></b></div><div class="stat">Best<b id="best"></b></div>
+      </div>
+      <div id="towerButtons"></div>
+      <div id="upgradeBox">
+        <div id="upTitle" class="small">Click a tower on the map to upgrade it.</div>
+        <button id="upA"></button><button id="upB"></button><button id="sellBtn"></button>
+      </div>
+      <button id="startBtn"></button>
+      <button id="sendBtn"></button>
+      <div id="preview"></div>
+      <div id="message"></div>
+      <div class="small">Keys: 1-5 tower, Q/W upgrade, X sell, Space wave, P pause, F speed, A auto, Esc cancel</div>
+    </div>
+  </div>
+  <div id="boardWrap" class="card">
+    <h2>Leaderboard (top 50)</h2>
+    <div id="boardScroll"><table><thead><tr><th>#</th><th>Name</th><th>Wave</th><th>Score</th><th>Map</th></tr></thead><tbody id="boardBody"></tbody></table></div>
+  </div>
+</section>
+<script src="config.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

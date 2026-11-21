@@ -63,12 +63,14 @@ const UPGRADES = [
 /* ---------- ENEMIES ----------
    size: fraction of a square | speed: pixels/sec | reward: gold
    laneSense: how much it avoids defended lanes (0 = ignores towers, 1 = normal)
-   flying + shortcutRange: flyers follow the lanes but may cut across bends within this many squares */
+   flying + shortcutRange: flyers follow the lanes but may cut across bends within this many squares
+   boss: true marks a boss wave warning | splitInto: { type, count } = on death it bursts into that many smaller enemies */
 const ENEMIES = {
   grunt: { name: 'Grunt', color: '#e05555', health: 40,  speed: 60,  size: 0.5,  reward: 8,  damageToBase: 1, laneSense: 1 },
   fast:  { name: 'Fast',  color: '#f2d64b', health: 25,  speed: 120, size: 0.38, reward: 10, damageToBase: 1, laneSense: 0.3 },
   tank:  { name: 'Tank',  color: '#a56bd6', health: 220, speed: 35,  size: 0.7,  reward: 25, damageToBase: 3, laneSense: 0.6 },
   flyer: { name: 'Flyer', color: '#ffffff', health: 30,  speed: 80,  size: 0.4,  reward: 12, damageToBase: 2, laneSense: 1, flying: true, shortcutRange: 3 },
+  boss:  { name: 'Boss',  color: '#8e1b3a', health: 1500, speed: 30, size: 1,    reward: 120, damageToBase: 10, laneSense: 0.2, boss: true, splitInto: { type: 'grunt', count: 6 } },
 };
 
 /* ---------- WAVES ---------- */
@@ -77,15 +79,17 @@ const WAVES = [
   [ { type: 'grunt', count: 12, gap: 0.7 } ],
   [ { type: 'grunt', count: 8,  gap: 0.7 }, { type: 'fast', count: 8, gap: 0.5 } ],
   [ { type: 'fast',  count: 12, gap: 0.4 }, { type: 'flyer', count: 5, gap: 0.8 }, { type: 'tank', count: 2, gap: 2 } ],
-  [ { type: 'tank',  count: 5,  gap: 1.8 }, { type: 'grunt', count: 15, gap: 0.5 } ],
+  [ { type: 'tank',  count: 5,  gap: 1.8 }, { type: 'grunt', count: 15, gap: 0.5 }, { type: 'boss', count: 1, gap: 1 } ],
   [ { type: 'tank',  count: 6,  gap: 1.4 }, { type: 'flyer', count: 10, gap: 0.5 }, { type: 'fast', count: 15, gap: 0.3 } ],
 ];
 const ENDLESS = { growth: 1.12, rewardGrowth: 0.05 };   // per wave after the hand-made ones
 function endlessWave(k) {
-  return [
+  const w = [
     { type: 'grunt', count: 10 + k * 2, gap: 0.45 }, { type: 'fast', count: 6 + k * 2, gap: 0.35 },
     { type: 'tank',  count: 2 + k,      gap: 1.2 },  { type: 'flyer', count: 4 + k * 2, gap: 0.6 },
   ];
+  if (k % 3 === 0) w.push({ type: 'boss', count: k / 3, gap: 4 });   // a boss (more later) on every 3rd endless wave
+  return w;
 }
 const waveGroups = n => n < WAVES.length ? WAVES[n] : endlessWave(n - WAVES.length + 1);
 
@@ -114,8 +118,79 @@ const MAPS = [
     [[0,15],[10,15],[10,12],[13,12],[13,9],[23,9]] ]) },
 ];
 
-/* ---------- PLACEHOLDER DRAWING ----------
-   Towers and enemies are squares for now. Replace these two functions to use sprites later */
+/* ---------- AUDIO ----------
+   Music and sound effects are placeholder beeps made by audio.js. To use real files, put them in the
+   sounds/ folder and write the file names below (mp3, ogg or wav). null = keep the placeholder beep.
+   Names: music, shoot_basic, shoot_rapid, shoot_heavy, shoot_frost, shoot_cannon, kill, bossDie, boss,
+          build, sell, upgrade, error, click, wave, clear, lifeLost, gameOver */
+const AUDIO = {
+  folder: 'sounds/',
+  musicVolume: 0.25, sfxVolume: 0.5,      // 0 to 1
+  storageKey: 'td_audio_v1',              // remembers your mute settings
+  files: {
+    music: null,
+    shoot_basic: null, shoot_rapid: null, shoot_heavy: null, shoot_frost: null, shoot_cannon: null,
+    kill: null, bossDie: null, boss: null, build: null, sell: null, upgrade: null, error: null, click: null,
+    wave: null, clear: null, lifeLost: null, gameOver: null,
+  },
+};
+
+/* ---------- SPRITES ----------
+   To use a sprite, put the image in the sprites/ folder and write its file name below.
+   Leave a value as null and the game keeps drawing the colored square for it.
+   Towers are drawn to fill one square (cellSize x cellSize). Enemies are drawn to fill their
+   hitbox (the "size" value in ENEMIES x cellSize), so change "size" to make a sprite bigger or smaller.
+   For an animation, use a horizontal strip of equal-width frames:
+       grunt: { file: 'grunt.png', frames: 4, fps: 8 }                                          */
+const SPRITES = {
+  folder: 'sprites/',
+  towers:  { basic: null, rapid: null, heavy: null, frost: null, cannon: null },
+  enemies: { grunt: 'grunt.png', fast: null, tank: null, flyer: null, boss: null },
+};
+
+const spriteCache = {};   // "towers/basic" -> { img, ok, frames, fps }
+function loadSprites() {
+  for (const kind of ['towers', 'enemies']) for (const name in SPRITES[kind]) {
+    let v = SPRITES[kind][name]; if (!v) continue;
+    if (typeof v === 'string') v = { file: v };
+    const s = { img: new Image(), ok: false, frames: v.frames || 1, fps: v.fps || 8 };
+    s.img.onload = () => { s.ok = true; if (typeof spriteLoaded === 'function') spriteLoaded(); };
+    s.img.onerror = () => console.warn('Sprite not found: ' + SPRITES.folder + v.file + ' (using placeholder)');
+    s.img.src = SPRITES.folder + v.file;
+    spriteCache[kind + '/' + name] = s;
+  }
+}
+loadSprites();
+
+// Draws a sprite centered in the box (x, y, w, h). Returns false if there is no loaded sprite, so the caller can fall back.
+function drawSprite(ctx, kind, name, x, y, w, h) {
+  const s = spriteCache[kind + '/' + name]; if (!s || !s.ok) return false;
+  const fw = s.img.width / s.frames, frame = s.frames > 1 ? Math.floor(performance.now() / 1000 * s.fps) % s.frames : 0;
+  ctx.imageSmoothingEnabled = false;   // keeps pixel art sharp
+  ctx.drawImage(s.img, frame * fw, 0, fw, s.img.height, x, y, w, h);
+  return true;
+}
+
+// Small canvas showing a sprite's first frame, for the wave preview. Returns null if there is no loaded sprite.
+function spriteIcon(kind, name, px) {
+  const s = spriteCache[kind + '/' + name]; if (!s || !s.ok) return null;
+  const cv = document.createElement('canvas'), g = cv.getContext('2d'); cv.width = cv.height = px;
+  g.imageSmoothingEnabled = false;
+  g.drawImage(s.img, 0, 0, s.img.width / s.frames, s.img.height, 0, 0, px, px);
+  return cv;
+}
+
+/* ---------- DRAWING ----------
+   game.js calls drawTower and drawEnemy. They use a sprite when one is set above and loaded,
+   otherwise the placeholder squares below. */
+function drawTower(ctx, key, def, x, y, s) {
+  if (!drawSprite(ctx, 'towers', key, x, y, s, s)) drawTowerPlaceholder(ctx, key, def, x, y, s);
+}
+function drawEnemy(ctx, type, def, cx, cy, size) {
+  if (!drawSprite(ctx, 'enemies', type, cx - size / 2, cy - size / 2, size, size)) drawEnemyPlaceholder(ctx, type, def, cx, cy, size);
+}
+
+/* Placeholders (fallbacks) */
 function drawTowerPlaceholder(ctx, key, def, x, y, s) {
   ctx.fillStyle = def.color;
   ctx.fillRect(x + 4, y + 4, s - 8, s - 8);

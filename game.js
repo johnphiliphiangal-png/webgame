@@ -158,12 +158,13 @@ function newGame(def) {
     buildType: null, selectedTower: null, mouse: null, over: false };
   load = new Map(); recomputeLanes();
   $('modal').hidden = true; $('paused').hidden = true;
+  Sound.setPaused(false); Sound.init(); Sound.startMusic();
   setText($('mapName'), 'Map: ' + def.name);
   setMessage('Pick a tower, then click a grass square to build it.');
   renderPreview(); updateUI();
 }
 function startGame(def) { inGame = true; $('menu').hidden = true; $('gameView').hidden = false; newGame(def); }
-function showMenu() { inGame = false; $('menu').hidden = false; $('gameView').hidden = true; renderBoards(); }
+function showMenu() { inGame = false; $('menu').hidden = false; $('gameView').hidden = true; Sound.setPaused(false); Sound.stopMusic(); renderBoards(); }
 
 function startWave(early) {
   if (state.over) return;
@@ -174,17 +175,22 @@ function startWave(early) {
   state.wave++; state.waveBatch++; state.waveActive = true; state.autoAt = 0;
   if (early) { state.gold += SETTINGS.sendEarlyBonus; state.sendCd = SETTINGS.sendEarlyCooldown; }
   setMessage('Wave ' + state.wave + (early ? ' sent early! +' + SETTINGS.sendEarlyBonus + ' gold.' : ' incoming!'));
+  Sound.play(waveGroups(n).some(g => ENEMIES[g.type].boss) ? 'boss' : 'wave');
   renderPreview(); updateUI();
 }
 const waveAction = () => { if (!state.waveActive) startWave(false); else if (state.sendCd <= 0) startWave(true); };
 
+function makeEnemy(type, hp, rw, cell, x, y, nxt) {   // hp and rw are the wave's health and reward multipliers
+  const d = ENEMIES[type];
+  const en = { type, flying: !!d.flying, x, y, cell, nxt: null, hp, rw, health: d.health * hp, maxHealth: d.health * hp,
+    reward: Math.round(d.reward * rw), slowFactor: 1, slowUntil: 0 };
+  if (d.flying) { en.plan = [cell]; en.pi = 0; for (let k = cell, n; (n = chooseNext(k, type, false)); k = n) en.plan.push(n); }
+  else en.nxt = nxt || chooseNext(cell, type);
+  return en;
+}
 function spawnEnemy(q) {
-  const d = ENEMIES[q.type], entry = map.entries[Math.floor(Math.random() * map.entries.length)], [x, y] = center(entry);
-  const en = { type: q.type, flying: !!d.flying, x, y, cell: entry, nxt: null, health: d.health * q.hp, maxHealth: d.health * q.hp,
-    reward: Math.round(d.reward * q.rw), slowFactor: 1, slowUntil: 0 };
-  if (d.flying) { en.plan = [entry]; en.pi = 0; for (let k = entry, n; (n = chooseNext(k, q.type, false)); k = n) en.plan.push(n); }
-  else en.nxt = chooseNext(entry, q.type);
-  state.enemies.push(en);
+  const entry = map.entries[Math.floor(Math.random() * map.entries.length)], [x, y] = center(entry);
+  state.enemies.push(makeEnemy(q.type, q.hp, q.rw, entry, x, y));
 }
 function moveGround(en, move) {
   while (move > 0 && en.nxt) {
@@ -226,7 +232,7 @@ function update(dt) {
   for (const en of state.enemies) {
     const d = ENEMIES[en.type], move = d.speed * dt * (state.time < en.slowUntil ? en.slowFactor : 1);
     if (en.flying) moveFlyer(en, d, move); else moveGround(en, move);
-    if (en.escaped) state.lives -= d.damageToBase;
+    if (en.escaped) { state.lives -= d.damageToBase; Sound.play('lifeLost'); }
   }
   state.enemies = state.enemies.filter(e => !e.escaped);
 
@@ -238,7 +244,7 @@ function update(dt) {
       if (Math.hypot(en.x - tx, en.y - ty) > s.range * S) continue;
       const pr = progress(en); if (pr > bp) { best = en; bp = pr; }
     }
-    if (best) { state.bullets.push({ x: tx, y: ty, target: best, damage: s.damage, speed: s.bulletSpeed, color: s.color, splash: s.splash, slow: s.slow, slowTime: s.slowTime }); t.cooldown = 1 / s.fireRate; }
+    if (best) { state.bullets.push({ x: tx, y: ty, target: best, damage: s.damage, speed: s.bulletSpeed, color: s.color, splash: s.splash, slow: s.slow, slowTime: s.slowTime }); t.cooldown = 1 / s.fireRate; Sound.play('shoot_' + t.key); }
   }
   for (const b of state.bullets) {
     if (b.target.health <= 0 || b.target.escaped) { b.dead = true; continue; }
@@ -254,13 +260,22 @@ function update(dt) {
   state.bullets = state.bullets.filter(b => !b.dead);
   for (const f of state.effects) f.life -= dt;
   state.effects = state.effects.filter(f => f.life > 0);
+  const born = [];   // enemies released by bursting bosses
   state.enemies = state.enemies.filter(en => {
     if (en.health > 0) return true;
-    state.gold += en.reward; state.score += en.reward * SETTINGS.scorePerRewardGold; return false;
+    state.gold += en.reward; state.score += en.reward * SETTINGS.scorePerRewardGold;
+    const sp = ENEMIES[en.type].splitInto;
+    if (sp) {
+      for (let i = 0; i < sp.count; i++) born.push(makeEnemy(sp.type, en.hp, en.rw, en.cell, en.x + (Math.random() - .5) * S, en.y + (Math.random() - .5) * S, en.nxt));
+      state.effects.push({ x: en.x, y: en.y, r: S * 2, life: .35, max: .35, color: '#ffd166' });
+      Sound.play('bossDie');
+    } else Sound.play('kill');
+    return false;
   });
+  state.enemies.push(...born);
 
   if (state.waveActive && !state.spawns.length && !state.enemies.length) {
-    state.waveActive = false;
+    state.waveActive = false; Sound.play('clear');
     const n = state.waveBatch; state.waveBatch = 0;
     state.gold += SETTINGS.waveBonusGold * n; state.score += SETTINGS.scorePerWave * n;
     if (autoOn) state.autoAt = state.time + SETTINGS.autoStartDelay;
@@ -271,7 +286,7 @@ function update(dt) {
 }
 
 function gameOver() {
-  state.over = true;
+  state.over = true; Sound.stopMusic(); Sound.play('gameOver');
   setText($('modalText'), `You reached wave ${state.wave} on ${map.def.name} with a score of ${state.score}.`);
   $('modal').hidden = false; $('nameInput').focus(); updateUI();
 }
@@ -290,23 +305,26 @@ for (const k of towerKeys) {
   b.onclick = () => selectBuild(k);
   towerButtons.appendChild(b);
 }
-function selectBuild(k) { if (state.over) return; state.buildType = state.buildType === k ? null : k; state.selectedTower = null; updateUI(); }
+function selectBuild(k) { if (state.over) return; Sound.play('click'); state.buildType = state.buildType === k ? null : k; state.selectedTower = null; updateUI(); }
+function spriteLoaded() { if (inGame && state) renderPreview(); }   // called by config.js when a sprite image finishes loading
 function renderPreview() {
   const box = $('preview'); box.innerHTML = '';
   const n = state.wave, k = Math.max(0, n - WAVES.length + 1), head = document.createElement('div');
   head.className = 'small'; head.textContent = 'Next: wave ' + (n + 1) + (k ? '  (health x' + Math.pow(ENDLESS.growth, k).toFixed(2) + ')' : '');
   box.appendChild(head);
   const tally = {}; for (const g of waveGroups(n)) tally[g.type] = (tally[g.type] || 0) + g.count;
-  for (const t in tally) { const d = ENEMIES[t], chip = document.createElement('span'); chip.className = 'chip'; chip.style.setProperty('--c', d.color); chip.textContent = tally[t] + '× ' + d.name + (d.flying ? ' (air)' : ''); box.appendChild(chip); }
+  for (const t in tally) { const d = ENEMIES[t], chip = document.createElement('span'); chip.className = 'chip'; chip.style.setProperty('--c', d.color);
+    const icon = spriteIcon('enemies', t, 14); if (icon) { chip.classList.add('has-sprite'); chip.appendChild(icon); }
+    chip.appendChild(document.createTextNode(tally[t] + '× ' + d.name + (d.flying ? ' (air)' : ''))); box.appendChild(chip); }
 }
 function buyUpgrade(p) {
   const t = state.selectedTower; if (!t || state.over || !canUpgrade(t, p)) return;
-  const cost = upgradeCost(t, p); if (state.gold < cost) return setMessage('Not enough gold.');
-  state.gold -= cost; t.spent += cost; t.tiers[p]++; laneDirty = true; updateUI();
+  const cost = upgradeCost(t, p); if (state.gold < cost) { Sound.play('error'); return setMessage('Not enough gold.'); }
+  state.gold -= cost; t.spent += cost; t.tiers[p]++; laneDirty = true; Sound.play('upgrade'); updateUI();
 }
 function sellTower(t) {
   if (!t || state.over) return;
-  state.gold += sellValue(t); state.towers.splice(state.towers.indexOf(t), 1);
+  Sound.play('sell'); state.gold += sellValue(t); state.towers.splice(state.towers.indexOf(t), 1);
   if (state.selectedTower === t) state.selectedTower = null;
   laneDirty = true; updateUI();
 }
@@ -317,7 +335,8 @@ function updateUI() {
   for (const b of towerButtons.children) { b.classList.toggle('selected', b.dataset.key === state.buildType); b.disabled = state.over; }
   setText($('pauseBtn'), state.paused ? 'Resume' : 'Pause');
   setText($('speedBtn'), 'Speed ' + state.speed + 'x');
-  setText($('autoBtn'), 'Auto: ' + (autoOn ? 'on' : 'off')); $('autoBtn').classList.toggle('on', autoOn);
+  $('autoChk').checked = autoOn;
+  setText($('musicBtn'), 'Music: ' + (Sound.musicOn ? 'on' : 'off')); setText($('sfxBtn'), 'Sound: ' + (Sound.sfxOn ? 'on' : 'off'));
   setText($('startBtn'), state.waveActive ? 'Wave in progress...' : 'Start wave ' + (state.wave + 1));
   $('startBtn').disabled = state.waveActive || state.over;
   setText($('sendBtn'), state.sendCd > 0 ? 'Send early (' + Math.ceil(state.sendCd) + 's)' : 'Send next wave early (+' + SETTINGS.sendEarlyBonus + 'g)');
@@ -342,22 +361,26 @@ canvas.addEventListener('click', e => {
   if (state.over || state.paused) return;
   const { c, r } = cellFromEvent(e); if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return;
   const existing = towerAt(c, r);
-  if (existing) { state.selectedTower = existing; state.buildType = null; updateUI(); return; }
+  if (existing) { state.selectedTower = existing; state.buildType = null; Sound.play('click'); updateUI(); return; }
   if (!state.buildType) { state.selectedTower = null; updateUI(); return; }
-  if (map.blocked.has(key(c, r))) return setMessage("Can't build there.");
-  const def = TOWERS[state.buildType]; if (state.gold < def.cost) return setMessage('Not enough gold.');
+  if (map.blocked.has(key(c, r))) { state.buildType = null; Sound.play('error'); updateUI(); return setMessage("Can't build there. Tower deselected."); }
+  const def = TOWERS[state.buildType]; if (state.gold < def.cost) { Sound.play('error'); return setMessage('Not enough gold.'); }
   state.gold -= def.cost; state.towers.push({ key: state.buildType, c, r, cooldown: 0, tiers: [0, 0], spent: def.cost });
-  state.selectedTower = null; laneDirty = true; setMessage(''); updateUI();
+  state.selectedTower = null; laneDirty = true; Sound.play('build'); setMessage(''); updateUI();
 });
-canvas.addEventListener('contextmenu', e => { e.preventDefault(); const { c, r } = cellFromEvent(e); sellTower(towerAt(c, r)); });
+canvas.addEventListener('contextmenu', e => {   // right-click: sell the tower under the cursor, or cancel what you're holding
+  e.preventDefault(); const { c, r } = cellFromEvent(e), t = towerAt(c, r);
+  if (t) sellTower(t); else if (state.buildType || state.selectedTower) { state.buildType = null; state.selectedTower = null; updateUI(); }
+});
 
-const togglePause = () => { if (state.over) return; state.paused = !state.paused; $('paused').hidden = !state.paused; updateUI(); };
+const togglePause = () => { if (state.over) return; state.paused = !state.paused; $('paused').hidden = !state.paused; Sound.setPaused(state.paused); updateUI(); };
 const cycleSpeed = () => { const o = SETTINGS.speedOptions; state.speed = o[(o.indexOf(state.speed) + 1) % o.length]; updateUI(); };
 const toggleAuto = () => { autoOn = !autoOn; if (autoOn && !state.waveActive && !state.over) state.autoAt = state.time + SETTINGS.autoStartDelay; if (!autoOn) state.autoAt = 0; updateUI(); };
 $('playBtn').onclick = () => startGame(pickMap());
 $('menuBtn').onclick = showMenu;
 $('restartBtn').onclick = () => newGame(SETTINGS.restartKeepsMap ? map.def : pickMap());   // restarts never touch the leaderboard
-$('pauseBtn').onclick = togglePause; $('speedBtn').onclick = cycleSpeed; $('autoBtn').onclick = toggleAuto;
+$('pauseBtn').onclick = togglePause; $('speedBtn').onclick = cycleSpeed; $('autoChk').onchange = () => { toggleAuto(); $('autoChk').blur(); };
+$('musicBtn').onclick = () => { Sound.toggleMusic(); updateUI(); }; $('sfxBtn').onclick = () => { Sound.toggleSfx(); Sound.play('click'); updateUI(); };
 $('startBtn').onclick = () => startWave(false); $('sendBtn').onclick = () => startWave(true);
 $('upA').onclick = () => buyUpgrade(0); $('upB').onclick = () => buyUpgrade(1);
 $('sellBtn').onclick = () => sellTower(state.selectedTower);
@@ -383,24 +406,24 @@ function draw() {
       const bad = map.blocked.has(key(c, r)) || towerAt(c, r);
       ctx.fillStyle = bad ? 'rgba(255,60,60,0.4)' : 'rgba(255,255,255,0.25)'; ctx.fillRect(c * S, r * S, S, S);
       drawRange(c * S + S / 2, r * S + S / 2, def.range * S);
-      ctx.globalAlpha = .6; drawTowerPlaceholder(ctx, state.buildType, def, c * S, r * S, S); ctx.globalAlpha = 1;
+      ctx.globalAlpha = .6; drawTower(ctx, state.buildType, def, c * S, r * S, S); ctx.globalAlpha = 1;
     }
   }
   for (const t of state.towers) {
     const x = t.c * S, y = t.r * S, sel = t === state.selectedTower;
     if (sel) drawRange(x + S / 2, y + S / 2, stats(t).range * S);
-    drawTowerPlaceholder(ctx, t.key, TOWERS[t.key], x, y, S);
+    drawTower(ctx, t.key, TOWERS[t.key], x, y, S);
     if (sel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(x + 4, y + 4, S - 8, S - 8); ctx.lineWidth = 1; }
     t.tiers.forEach((n, i) => { ctx.fillStyle = i === 0 ? '#fff' : '#222'; for (let k = 0; k < n; k++) ctx.fillRect(x + 8 + k * 7, i === 0 ? y + 7 : y + S - 12, 5, 5); });
   }
   for (const en of state.enemies) {
     const d = ENEMIES[en.type], size = d.size * S;
-    drawEnemyPlaceholder(ctx, en.type, d, en.x, en.y, size);
+    drawEnemy(ctx, en.type, d, en.x, en.y, size);
     if (state.time < en.slowUntil) { ctx.strokeStyle = '#7fe7ff'; ctx.strokeRect(en.x - size / 2 - 2, en.y - size / 2 - 2, size + 4, size + 4); }
     ctx.fillStyle = '#400'; ctx.fillRect(en.x - size / 2, en.y - size / 2 - 6, size, 3);
     ctx.fillStyle = '#3ddc84'; ctx.fillRect(en.x - size / 2, en.y - size / 2 - 6, size * Math.max(0, en.health / en.maxHealth), 3);
   }
-  for (const f of state.effects) { ctx.globalAlpha = Math.max(0, f.life / 0.15) * 0.6; drawRange(f.x, f.y, f.r, '#ff6b9d'); ctx.globalAlpha = 1; }
+  for (const f of state.effects) { ctx.globalAlpha = Math.max(0, f.life / (f.max || 0.15)) * 0.6; drawRange(f.x, f.y, f.r, f.color || '#ff6b9d'); ctx.globalAlpha = 1; }
   for (const b of state.bullets) { ctx.fillStyle = b.color; ctx.fillRect(b.x - 3, b.y - 3, 6, 6); }
 }
 

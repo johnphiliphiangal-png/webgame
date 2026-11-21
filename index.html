@@ -24,7 +24,7 @@
 <section id="gameView" class="screen" hidden>
   <div id="bar">
     <b id="mapName"></b><span class="spacer"></span>
-    <button id="pauseBtn"></button><button id="speedBtn"></button><button id="autoBtn"></button>
+    <button id="pauseBtn"></button><button id="speedBtn"></button><button id="musicBtn"></button><button id="sfxBtn"></button>
     <button id="restartBtn">Restart</button><button id="menuBtn">Menu</button>
   </div>
   <div id="game">
@@ -53,10 +53,13 @@
       </div>
       <button id="startBtn"></button>
       <button id="sendBtn"></button>
-      <div id="preview"></div>
-      <div id="message"></div>
-      <div class="small">Keys: 1-5 tower, Q/W upgrade, X sell, Space wave, P pause, F speed, A auto, Esc cancel</div>
+      <label class="toggle"><input type="checkbox" id="autoChk"><span class="track"></span>Auto-start waves</label>
     </div>
+  </div>
+  <div id="infoBar">
+    <div id="preview"></div>
+    <div id="message"></div>
+    <div class="small keys">Keys: 1-5 tower, Q/W upgrade, X sell, Space wave, P pause, F speed, A auto, Esc cancel</div>
   </div>
   <div id="boardWrap" class="card">
     <h2>Leaderboard (top 50)</h2>
@@ -64,6 +67,7 @@
   </div>
 </section>
 <script src="config.js"></script>
+<script src="audio.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

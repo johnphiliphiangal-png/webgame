@@ -417,11 +417,11 @@ function draw() {
     t.tiers.forEach((n, i) => { ctx.fillStyle = i === 0 ? '#fff' : '#222'; for (let k = 0; k < n; k++) ctx.fillRect(x + 8 + k * 7, i === 0 ? y + 7 : y + S - 12, 5, 5); });
   }
   for (const en of state.enemies) {
-    const d = ENEMIES[en.type], size = d.size * S;
+    const d = ENEMIES[en.type], size = d.size * S, hgt = size * Math.min(1, spriteAspect('enemies', en.type));
     drawEnemy(ctx, en.type, d, en.x, en.y, size);
-    if (state.time < en.slowUntil) { ctx.strokeStyle = '#7fe7ff'; ctx.strokeRect(en.x - size / 2 - 2, en.y - size / 2 - 2, size + 4, size + 4); }
-    ctx.fillStyle = '#400'; ctx.fillRect(en.x - size / 2, en.y - size / 2 - 6, size, 3);
-    ctx.fillStyle = '#3ddc84'; ctx.fillRect(en.x - size / 2, en.y - size / 2 - 6, size * Math.max(0, en.health / en.maxHealth), 3);
+    if (state.time < en.slowUntil) { ctx.strokeStyle = '#7fe7ff'; ctx.strokeRect(en.x - size / 2 - 2, en.y - hgt / 2 - 2, size + 4, hgt + 4); }
+    ctx.fillStyle = '#400'; ctx.fillRect(en.x - size / 2, en.y - hgt / 2 - 6, size, 3);
+    ctx.fillStyle = '#3ddc84'; ctx.fillRect(en.x - size / 2, en.y - hgt / 2 - 6, size * Math.max(0, en.health / en.maxHealth), 3);
   }
   for (const f of state.effects) { ctx.globalAlpha = Math.max(0, f.life / (f.max || 0.15)) * 0.6; drawRange(f.x, f.y, f.r, f.color || '#ff6b9d'); ctx.globalAlpha = 1; }
   for (const b of state.bullets) { ctx.fillStyle = b.color; ctx.fillRect(b.x - 3, b.y - 3, 6, 6); }

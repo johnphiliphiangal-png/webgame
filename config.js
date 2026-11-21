@@ -69,7 +69,7 @@ const ENEMIES = {
   grunt: { name: 'Grunt', color: '#e05555', health: 40,  speed: 60,  size: 0.5,  reward: 8,  damageToBase: 1, laneSense: 1 },
   fast:  { name: 'Fast',  color: '#f2d64b', health: 25,  speed: 120, size: 0.38, reward: 10, damageToBase: 1, laneSense: 0.3 },
   tank:  { name: 'Tank',  color: '#a56bd6', health: 220, speed: 35,  size: 0.7,  reward: 25, damageToBase: 3, laneSense: 0.6 },
-  flyer: { name: 'Flyer', color: '#ffffff', health: 30,  speed: 80,  size: 0.4,  reward: 12, damageToBase: 2, laneSense: 1, flying: true, shortcutRange: 3 },
+  flyer: { name: 'Flyer', color: '#ffffff', health: 30,  speed: 80,  size: 0.9375, reward: 12, damageToBase: 2, laneSense: 1, flying: true, shortcutRange: 3 },
   boss:  { name: 'Boss',  color: '#8e1b3a', health: 1500, speed: 30, size: 1,    reward: 120, damageToBase: 10, laneSense: 0.2, boss: true, splitInto: { type: 'grunt', count: 6 } },
 };
 
@@ -138,6 +138,7 @@ const AUDIO = {
 /* ---------- SPRITES ----------
    To use a sprite, put the image in the sprites/ folder and write its file name below.
    Leave a value as null and the game keeps drawing the colored square for it.
+   Sprites don't have to be square: they are scaled to fit the box and keep their proportions.
    Towers are drawn to fill one square (cellSize x cellSize). Enemies are drawn to fill their
    hitbox (the "size" value in ENEMIES x cellSize), so change "size" to make a sprite bigger or smaller.
    For an animation, use a horizontal strip of equal-width frames:
@@ -145,7 +146,7 @@ const AUDIO = {
 const SPRITES = {
   folder: 'sprites/',
   towers:  { basic: null, rapid: null, heavy: null, frost: null, cannon: null },
-  enemies: { grunt: 'grunt.png', fast: null, tank: null, flyer: null, boss: null },
+  enemies: { grunt: 'grunt.png', fast: null, tank: null, flyer: 'flyer.png', boss: null },
 };
 
 const spriteCache = {};   // "towers/basic" -> { img, ok, frames, fps }
@@ -165,9 +166,10 @@ loadSprites();
 // Draws a sprite centered in the box (x, y, w, h). Returns false if there is no loaded sprite, so the caller can fall back.
 function drawSprite(ctx, kind, name, x, y, w, h) {
   const s = spriteCache[kind + '/' + name]; if (!s || !s.ok) return false;
-  const fw = s.img.width / s.frames, frame = s.frames > 1 ? Math.floor(performance.now() / 1000 * s.fps) % s.frames : 0;
+  const fw = s.img.width / s.frames, fh = s.img.height, frame = s.frames > 1 ? Math.floor(performance.now() / 1000 * s.fps) % s.frames : 0;
+  const k = Math.min(w / fw, h / fh), dw = fw * k, dh = fh * k;   // fit inside the box without stretching (non-square sprites are fine)
   ctx.imageSmoothingEnabled = false;   // keeps pixel art sharp
-  ctx.drawImage(s.img, frame * fw, 0, fw, s.img.height, x, y, w, h);
+  ctx.drawImage(s.img, frame * fw, 0, fw, fh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
   return true;
 }
 
@@ -176,8 +178,13 @@ function spriteIcon(kind, name, px) {
   const s = spriteCache[kind + '/' + name]; if (!s || !s.ok) return null;
   const cv = document.createElement('canvas'), g = cv.getContext('2d'); cv.width = cv.height = px;
   g.imageSmoothingEnabled = false;
-  g.drawImage(s.img, 0, 0, s.img.width / s.frames, s.img.height, 0, 0, px, px);
+  const fw = s.img.width / s.frames, k = Math.min(px / fw, px / s.img.height), dw = fw * k, dh = s.img.height * k;
+  g.drawImage(s.img, 0, 0, fw, s.img.height, (px - dw) / 2, (px - dh) / 2, dw, dh);
   return cv;
+}
+// Height / width of a loaded sprite (1 for square sprites and placeholders). Used to place health bars on wide or tall sprites.
+function spriteAspect(kind, name) {
+  const s = spriteCache[kind + '/' + name]; return s && s.ok ? s.img.height / (s.img.width / s.frames) : 1;
 }
 
 /* ---------- DRAWING ----------

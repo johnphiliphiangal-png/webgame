@@ -67,10 +67,10 @@ const UPGRADES = [
    boss: true marks a boss wave warning | splitInto: { type, count } = on death it bursts into that many smaller enemies */
 const ENEMIES = {
   grunt: { name: 'Grunt', color: '#e05555', health: 40,  speed: 60,  size: 0.5,  reward: 8,  damageToBase: 1, laneSense: 1 },
-  fast:  { name: 'Fast',  color: '#f2d64b', health: 25,  speed: 120, size: 0.38, reward: 10, damageToBase: 1, laneSense: 0.3 },
-  tank:  { name: 'Tank',  color: '#a56bd6', health: 220, speed: 35,  size: 0.7,  reward: 25, damageToBase: 3, laneSense: 0.6 },
+  fast:  { name: 'Fast',  color: '#f2d64b', health: 25,  speed: 120, size: 0.5,  reward: 10, damageToBase: 1, laneSense: 0.3 },
+  tank:  { name: 'Tank',  color: '#a56bd6', health: 220, speed: 35,  size: 1,    reward: 25, damageToBase: 3, laneSense: 0.6 },
   flyer: { name: 'Flyer', color: '#ffffff', health: 30,  speed: 80,  size: 0.9375, reward: 12, damageToBase: 2, laneSense: 1, flying: true, shortcutRange: 3 },
-  boss:  { name: 'Boss',  color: '#8e1b3a', health: 1500, speed: 30, size: 1,    reward: 120, damageToBase: 10, laneSense: 0.2, boss: true, splitInto: { type: 'grunt', count: 6 } },
+  boss:  { name: 'Boss',  color: '#8e1b3a', health: 1500, speed: 30, size: 1.5,  reward: 120, damageToBase: 10, laneSense: 0.2, boss: true, splitInto: { type: 'grunt', count: 6 } },
 };
 
 /* ---------- WAVES ---------- */
@@ -146,7 +146,7 @@ const AUDIO = {
 const SPRITES = {
   folder: 'sprites/',
   towers:  { basic: null, rapid: null, heavy: null, frost: null, cannon: null },
-  enemies: { grunt: 'grunt.png', fast: null, tank: null, flyer: 'flyer.png', boss: null },
+  enemies: { grunt: 'grunt.png', fast: 'fast.png', tank: 'tank.png', flyer: 'flyer.png', boss: 'boss.png' },
 };
 
 const spriteCache = {};   // "towers/basic" -> { img, ok, frames, fps }

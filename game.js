@@ -10,7 +10,11 @@ document.title = SETTINGS.gameTitle; $('title').textContent = SETTINGS.gameTitle
 const key = (c, r) => c + ',' + r;
 const parse = k => k.split(',').map(Number);
 const setText = (el, t) => { if (el.textContent !== t) el.textContent = t; };
-const setMessage = t => { setText($('message'), t); setText($('toast'), t); $('toast').classList.toggle('show', !!t); };   // the toast is the same message shown on the map (phones)
+let toastTimer = 0;
+const setMessage = t => {   // the toast is the same message shown on the map (phones); it fades after 2 seconds so it never blocks the map
+  setText($('message'), t); setText($('toast'), t); $('toast').classList.toggle('show', !!t);
+  clearTimeout(toastTimer); if (t) toastTimer = setTimeout(() => $('toast').classList.remove('show'), 2000);
+};
 const hash = (c, r, k, sd) => { const x = Math.sin(c * 127.1 + r * 311.7 + k * 74.7 + sd * 13.3) * 43758.5453; return x - Math.floor(x); };
 const center = k => { const [c, r] = parse(k); return [c * S + S / 2, r * S + S / 2]; };
 

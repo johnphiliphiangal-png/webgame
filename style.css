@@ -89,7 +89,7 @@ th { position: sticky; top: 0; background: var(--panel-bg); color: var(--muted);
    ===================================================================== */
 body { touch-action: manipulation; }   /* no double-tap zoom delay; pinch zoom still works */
 canvas, button, .toggle, .stat { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-#toast { display: none; position: absolute; left: 8px; right: 8px; bottom: 8px; padding: 6px 10px; background: rgba(10,12,18,.88); color: var(--accent); border-radius: 4px; font-size: .85rem; pointer-events: none; }
+#toast { display: none; position: absolute; left: 50%; transform: translateX(-50%); bottom: 6px; width: max-content; max-width: calc(100% - 16px); padding: 3px 8px; background: rgba(10,12,18,.75); color: var(--accent); border-radius: 4px; font-size: .75rem; text-align: center; pointer-events: none; }
 
 @media (pointer: coarse) { button, .toggle { min-height: 44px; } }   /* finger-sized tap targets */
 @media (hover: none) { .keys { display: none; } }                    /* keyboard hints are useless on a phone */

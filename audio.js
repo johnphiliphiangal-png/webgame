@@ -25,7 +25,7 @@ const Sound = (() => {
     applyVolumes();
     if (wantMusic) startMusic();
   }
-  ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, init));
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, init));
 
   function applyVolumes() {
     if (fileMusic) fileMusic.volume = musicOn ? AUDIO.musicVolume : 0;

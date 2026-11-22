@@ -2,6 +2,7 @@ const $ = id => document.getElementById(id);
 const S = SETTINGS.cellSize, P = S / 8, COLS = SETTINGS.cols, ROWS = SETTINGS.rows;
 document.documentElement.style.setProperty('--game-width', COLS * S + 'px');
 document.documentElement.style.setProperty('--game-height', ROWS * S + 'px');
+document.documentElement.style.setProperty('--game-aspect', COLS + ' / ' + ROWS);   // the map scales down on small screens
 const canvas = $('canvas'), ctx = canvas.getContext('2d');
 canvas.width = COLS * S; canvas.height = ROWS * S;
 document.title = SETTINGS.gameTitle; $('title').textContent = SETTINGS.gameTitle;
@@ -9,7 +10,7 @@ document.title = SETTINGS.gameTitle; $('title').textContent = SETTINGS.gameTitle
 const key = (c, r) => c + ',' + r;
 const parse = k => k.split(',').map(Number);
 const setText = (el, t) => { if (el.textContent !== t) el.textContent = t; };
-const setMessage = t => setText($('message'), t);
+const setMessage = t => { setText($('message'), t); setText($('toast'), t); $('toast').classList.toggle('show', !!t); };   // the toast is the same message shown on the map (phones)
 const hash = (c, r, k, sd) => { const x = Math.sin(c * 127.1 + r * 311.7 + k * 74.7 + sd * 13.3) * 43758.5453; return x - Math.floor(x); };
 const center = k => { const [c, r] = parse(k); return [c * S + S / 2, r * S + S / 2]; };
 
@@ -155,7 +156,7 @@ function newGame(def) {
   map = buildMap(def); lastMapName = def.name;
   state = { gold: SETTINGS.startGold, lives: SETTINGS.startLives, wave: 0, score: 0, time: 0, speed: 1, paused: false,
     towers: [], enemies: [], bullets: [], effects: [], spawns: [], waveActive: false, waveBatch: 0, autoAt: 0, sendCd: 0,
-    buildType: null, selectedTower: null, mouse: null, over: false };
+    buildType: null, selectedTower: null, mouse: null, pending: null, over: false };
   load = new Map(); recomputeLanes();
   $('modal').hidden = true; $('paused').hidden = true;
   Sound.setPaused(false); Sound.init(); Sound.startMusic();
@@ -305,7 +306,7 @@ for (const k of towerKeys) {
   b.onclick = () => selectBuild(k);
   towerButtons.appendChild(b);
 }
-function selectBuild(k) { if (state.over) return; Sound.play('click'); state.buildType = state.buildType === k ? null : k; state.selectedTower = null; updateUI(); }
+function selectBuild(k) { if (state.over) return; Sound.play('click'); state.buildType = state.buildType === k ? null : k; state.selectedTower = null; if (!state.buildType) { state.pending = null; state.mouse = null; } updateUI(); }
 function spriteLoaded() { if (inGame && state) renderPreview(); }   // called by config.js when a sprite image finishes loading
 function renderPreview() {
   const box = $('preview'); box.innerHTML = '';
@@ -353,25 +354,35 @@ function updateUI() {
 }
 
 /* ---------- Events ---------- */
-const cellFromEvent = e => { const r = canvas.getBoundingClientRect(); return { c: Math.floor((e.clientX - r.left) / S), r: Math.floor((e.clientY - r.top) / S) }; };
+// Converts a mouse/touch position to a map square. The canvas can be scaled down by CSS on small screens, so scale back up first.
+const cellFromEvent = e => { const r = canvas.getBoundingClientRect(), k = canvas.width / r.width; return { c: Math.floor((e.clientX - r.left) * k / S), r: Math.floor((e.clientY - r.top) * k / S) }; };
 const towerAt = (c, r) => state.towers.find(t => t.c === c && t.r === r);
-canvas.addEventListener('mousemove', e => { if (state) state.mouse = cellFromEvent(e); });
-canvas.addEventListener('mouseleave', () => { if (state) state.mouse = null; });
+let pointer = 'mouse';   // 'mouse', 'pen' or 'touch'. On a phone, building takes two taps: the first previews the square, the second builds.
+canvas.addEventListener('pointerdown', e => { pointer = e.pointerType; });
+canvas.addEventListener('pointermove', e => { if (state && e.pointerType !== 'touch') state.mouse = cellFromEvent(e); });
+canvas.addEventListener('pointerleave', e => { if (state && e.pointerType !== 'touch') state.mouse = null; });
 canvas.addEventListener('click', e => {
   if (state.over || state.paused) return;
   const { c, r } = cellFromEvent(e); if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return;
-  const existing = towerAt(c, r);
-  if (existing) { state.selectedTower = existing; state.buildType = null; Sound.play('click'); updateUI(); return; }
+  const touch = pointer === 'touch', existing = towerAt(c, r);
+  if (existing) { state.selectedTower = existing; state.buildType = null; state.pending = null; if (touch) state.mouse = null; Sound.play('click'); updateUI(); return; }
   if (!state.buildType) { state.selectedTower = null; updateUI(); return; }
-  if (map.blocked.has(key(c, r))) { state.buildType = null; Sound.play('error'); updateUI(); return setMessage("Can't build there. Tower deselected."); }
+  const bad = map.blocked.has(key(c, r));
+  if (touch) {
+    const again = state.pending && state.pending.c === c && state.pending.r === r;
+    if (!again) { state.pending = { c, r }; state.mouse = { c, r }; if (bad) Sound.play('error'); return setMessage(bad ? "Can't build there." : 'Tap again to build here.'); }
+    if (bad) { Sound.play('error'); return setMessage("Can't build there."); }
+  } else if (bad) { state.buildType = null; Sound.play('error'); updateUI(); return setMessage("Can't build there. Tower deselected."); }
   const def = TOWERS[state.buildType]; if (state.gold < def.cost) { Sound.play('error'); return setMessage('Not enough gold.'); }
   state.gold -= def.cost; state.towers.push({ key: state.buildType, c, r, cooldown: 0, tiers: [0, 0], spent: def.cost });
-  state.selectedTower = null; laneDirty = true; Sound.play('build'); setMessage(''); updateUI();
+  state.selectedTower = null; state.pending = null; if (touch) state.mouse = null; laneDirty = true; Sound.play('build'); setMessage(''); updateUI();
 });
 canvas.addEventListener('contextmenu', e => {   // right-click: sell the tower under the cursor, or cancel what you're holding
-  e.preventDefault(); const { c, r } = cellFromEvent(e), t = towerAt(c, r);
+  e.preventDefault(); if (pointer === 'touch') return;   // a long-press on a phone must never sell a tower
+  const { c, r } = cellFromEvent(e), t = towerAt(c, r);
   if (t) sellTower(t); else if (state.buildType || state.selectedTower) { state.buildType = null; state.selectedTower = null; updateUI(); }
 });
+document.addEventListener('visibilitychange', () => { if (document.hidden && inGame && state && !state.over && !state.paused) togglePause(); });   // pause when you switch apps
 
 const togglePause = () => { if (state.over) return; state.paused = !state.paused; $('paused').hidden = !state.paused; Sound.setPaused(state.paused); updateUI(); };
 const cycleSpeed = () => { const o = SETTINGS.speedOptions; state.speed = o[(o.indexOf(state.speed) + 1) % o.length]; updateUI(); };

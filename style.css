@@ -7,10 +7,12 @@
   --accent: #ffd166; --button-bg: #323a4f; --button-selected: #4a5778;
   --game-width: 768px; --game-height: 576px;   /* set automatically from config.js */
   --panel-width: 280px;
+  --neon-1: #00f0ff; --neon-2: #ff2bd6; --neon-3: #8a4dff;   /* neon colors: cyan, magenta, purple */
 }
+html { background: var(--page-bg); }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; padding: 16px; background: var(--page-bg); color: var(--text); font-family: system-ui, sans-serif; }
+body { margin: 0; padding: 16px; background: transparent; color: var(--text); font-family: system-ui, sans-serif; }
 h1 { margin: 0 0 6px; font-size: 2rem; }
 h2 { margin: 0 0 8px; font-size: 1.1rem; }
 .muted, .small { color: var(--muted); font-size: .8rem; }
@@ -129,3 +131,26 @@ canvas, button, .toggle, .stat { -webkit-tap-highlight-color: transparent; -webk
   #boardScroll { height: 200px; }
   th, td { padding: 4px 5px; font-size: .8rem; }
 }
+
+/* =====================================================================
+   Neon lighting
+   Colors are --neon-1/2/3 at the top of this file. Delete this whole block to remove the effect.
+   ===================================================================== */
+body::before {   /* soft colored light drifting slowly behind everything */
+  content: ''; position: fixed; inset: -25%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(40% 35% at 20% 25%, rgba(0, 240, 255, .28), transparent 70%),
+    radial-gradient(35% 40% at 80% 20%, rgba(255, 43, 214, .26), transparent 70%),
+    radial-gradient(45% 40% at 70% 85%, rgba(138, 77, 255, .28), transparent 70%),
+    radial-gradient(30% 30% at 15% 80%, rgba(0, 255, 150, .14), transparent 70%);
+  animation: neonDrift 22s ease-in-out infinite alternate;
+}
+@keyframes neonDrift {
+  from { transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1); }
+  to   { transform: translate3d(3%, 2%, 0) rotate(6deg) scale(1.08); }
+}
+canvas { box-shadow: 0 0 0 2px rgba(0, 240, 255, .55), 0 0 22px rgba(0, 240, 255, .4), 0 0 70px rgba(255, 43, 214, .25); }
+#panel, #infoBar, .card { box-shadow: 0 0 0 1px rgba(138, 77, 255, .45), 0 0 18px rgba(138, 77, 255, .25); }
+h1 { text-shadow: 0 0 8px var(--neon-1), 0 0 22px var(--neon-2); }
+button.big { box-shadow: 0 0 14px rgba(255, 209, 102, .55); }
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }

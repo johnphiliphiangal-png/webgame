@@ -2,16 +2,16 @@ const $ = id => document.getElementById(id);
 const S = SETTINGS.cellSize, P = S / 8, COLS = SETTINGS.cols, ROWS = SETTINGS.rows;
 document.documentElement.style.setProperty('--game-width', COLS * S + 'px');
 document.documentElement.style.setProperty('--game-height', ROWS * S + 'px');
-document.documentElement.style.setProperty('--game-aspect', COLS + ' / ' + ROWS);   // the map scales down on small screens
+document.documentElement.style.setProperty('--game-aspect', COLS + ' / ' + ROWS);
 const canvas = $('canvas'), ctx = canvas.getContext('2d');
 canvas.width = COLS * S; canvas.height = ROWS * S;
 document.title = SETTINGS.gameTitle; $('title').textContent = SETTINGS.gameTitle;
 
 const key = (c, r) => c + ',' + r;
 const parse = k => k.split(',').map(Number);
-const setText = (el, t) => { if (el.textContent !== t) el.textContent = t; };
+const setText = (el, t) => { t = String(t); if (el.textContent !== t) el.textContent = t; };
 let toastTimer = 0;
-const setMessage = t => {   // the toast is the same message shown on the map (phones); it disappears after half a second (500 ms) so it never blocks the map
+const setMessage = t => {
   setText($('message'), t); setText($('toast'), t); $('toast').classList.toggle('show', !!t);
   clearTimeout(toastTimer); if (t) toastTimer = setTimeout(() => $('toast').classList.remove('show'), 500);
 };
@@ -21,7 +21,8 @@ const center = k => { const [c, r] = parse(k); return [c * S + S / 2, r * S + S 
 let map, state, plans = {}, danger = new Map(), load = new Map(), laneDirty = true;
 let inGame = false, autoOn = false, lastMapName = null, memScores = [];
 
-/* ---------- Leaderboard (saved in this browser with localStorage) ---------- */
+/* ---------- Leaderboard ---------- */
+let bestScore = 0;
 const loadScores = () => { try { return JSON.parse(localStorage.getItem(SETTINGS.storageKey)) || []; } catch (e) { return memScores; } };
 function addScore(name, score, wave, mapName) {
   const list = loadScores(); list.push({ name, score, wave, map: mapName });
@@ -36,9 +37,9 @@ function fillBoard(id, limit) {
   if (!list.length) { const td = body.insertRow().insertCell(); td.colSpan = 5; td.textContent = 'No scores yet.'; }
   list.forEach((s, i) => { const tr = body.insertRow(); [i + 1, s.name, s.wave, s.score, s.map || '-'].forEach(v => { tr.insertCell().textContent = v; }); });
 }
-const renderBoards = () => { fillBoard('menuBody', SETTINGS.menuLeaderboardSize); fillBoard('boardBody', SETTINGS.leaderboardSize); };
+const renderBoards = () => { bestScore = loadScores()[0] ? loadScores()[0].score : 0; fillBoard('menuBody', SETTINGS.menuLeaderboardSize); fillBoard('boardBody', SETTINGS.leaderboardSize); };
 
-/* ---------- Map: route network, blocked squares and pixel art ---------- */
+/* ---------- Map ---------- */
 function buildMap(def) {
   const cells = new Set(), out = new Map(), entries = []; let exit;
   for (const rt of def.routes) {
@@ -86,15 +87,22 @@ function bakeMap(m) {
       else if (v < .18) { p(Math.floor(h(2) * 6) + 1, Math.floor(h(3) * 6) + 1, C.flowers[0]); p(Math.floor(h(4) * 6) + 1, Math.floor(h(6) * 6) + 1, C.flowers[1]); }
     }
   }
-  m.entries.forEach((k, i) => {   // entrance and exit markers
-    const [x, y] = center(k); g.fillStyle = C.entrances[i % 3]; g.strokeStyle = '#222'; g.lineWidth = 2;
-    g.beginPath(); g.arc(x, y, 12, 0, 7); g.fill(); g.stroke();
-    g.fillStyle = '#222'; g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(i + 1, x, y + 1);
-  });
-  const [ex, ey] = center(m.exit);
-  g.fillStyle = '#fff'; g.strokeStyle = '#222'; g.fillRect(ex - 12, ey - 12, 24, 24); g.strokeRect(ex - 12, ey - 12, 24, 24);
-  g.fillStyle = '#222'; g.font = 'bold 10px sans-serif'; g.fillText('EXIT', ex, ey + 1);
   return bg;
+}
+function drawPortals() {
+  map.entries.forEach((k, i) => {
+    const [x, y] = center(k);
+    if (drawSprite(ctx, 'other', 'portal' + (i % 3 + 1), x - S / 2, y - S / 2, S, S)) return;
+    ctx.fillStyle = PALETTE.entrances[i % 3]; ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 12, 0, 7); ctx.fill(); ctx.stroke(); ctx.lineWidth = 1;
+    ctx.fillStyle = '#222'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(i + 1, x, y + 1);
+  });
+}
+function drawBase() {
+  const [ex, ey] = center(map.exit);
+  if (drawSprite(ctx, 'other', 'base', ex - S / 2, ey - S / 2, S, S)) return;
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#222'; ctx.fillRect(ex - 12, ey - 12, 24, 24); ctx.strokeRect(ex - 12, ey - 12, 24, 24);
+  ctx.fillStyle = '#222'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('EXIT', ex, ey + 1);
 }
 function pickMap() {
   if (SETTINGS.mapSelection !== 'random') { const f = MAPS.find(m => m.name === SETTINGS.mapSelection); if (f) return f; }
@@ -102,7 +110,7 @@ function pickMap() {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-/* ---------- Lane AI: enemies choose a branch at each fork ---------- */
+/* ---------- Lane AI ---------- */
 const laneCost = (k, type) => LANE_AI.lengthWeight + LANE_AI.dangerWeight * (ENEMIES[type].laneSense ?? 1) * (danger.get(k) || 0);
 function recomputeLanes() {
   danger = new Map();
@@ -185,7 +193,7 @@ function startWave(early) {
 }
 const waveAction = () => { if (!state.waveActive) startWave(false); else if (state.sendCd <= 0) startWave(true); };
 
-function makeEnemy(type, hp, rw, cell, x, y, nxt) {   // hp and rw are the wave's health and reward multipliers
+function makeEnemy(type, hp, rw, cell, x, y, nxt) {
   const d = ENEMIES[type];
   const en = { type, flying: !!d.flying, x, y, cell, nxt: null, hp, rw, health: d.health * hp, maxHealth: d.health * hp,
     reward: Math.round(d.reward * rw), slowFactor: 1, slowUntil: 0 };
@@ -205,7 +213,7 @@ function moveGround(en, move) {
   }
   if (!en.nxt) en.escaped = true;
 }
-function moveFlyer(en, d, move) {   // follows its lane but may cut across bends within shortcutRange
+function moveFlyer(en, d, move) {
   const R = (d.shortcutRange || 0) * S + 1;
   while (move > 0 && en.pi < en.plan.length - 1) {
     let j = en.pi + 1;
@@ -265,7 +273,7 @@ function update(dt) {
   state.bullets = state.bullets.filter(b => !b.dead);
   for (const f of state.effects) f.life -= dt;
   state.effects = state.effects.filter(f => f.life > 0);
-  const born = [];   // enemies released by bursting bosses
+  const born = [];
   state.enemies = state.enemies.filter(en => {
     if (en.health > 0) return true;
     state.gold += en.reward; state.score += en.reward * SETTINGS.scorePerRewardGold;
@@ -287,7 +295,6 @@ function update(dt) {
     setMessage(`Wave ${state.wave} cleared! +${SETTINGS.waveBonusGold * n} gold.` + (autoOn ? '' : ' Upgrade or build, then start the next one.'));
   }
   if (state.lives <= 0) { state.lives = 0; gameOver(); }
-  updateUI();
 }
 
 function gameOver() {
@@ -310,8 +317,15 @@ for (const k of towerKeys) {
   b.onclick = () => selectBuild(k);
   towerButtons.appendChild(b);
 }
+function refreshTowerIcons() {
+  for (const b of towerButtons.children) {
+    const icon = spriteIcon('towers', b.dataset.key, 32), old = b.firstElementChild;
+    if (icon && old && old.classList.contains('swatch')) { icon.className = 'towerIcon'; b.replaceChild(icon, old); }
+  }
+}
+refreshTowerIcons();
 function selectBuild(k) { if (state.over) return; Sound.play('click'); state.buildType = state.buildType === k ? null : k; state.selectedTower = null; if (!state.buildType) { state.pending = null; state.mouse = null; } updateUI(); }
-function spriteLoaded() { if (inGame && state) renderPreview(); }   // called by config.js when a sprite image finishes loading
+function spriteLoaded() { refreshTowerIcons(); if (inGame && state) renderPreview(); }
 function renderPreview() {
   const box = $('preview'); box.innerHTML = '';
   const n = state.wave, k = Math.max(0, n - WAVES.length + 1), head = document.createElement('div');
@@ -336,7 +350,7 @@ function sellTower(t) {
 function updateUI() {
   setText($('gold'), state.gold); setText($('lives'), state.lives); setText($('wave'), state.wave);
   setText($('enemies'), state.enemies.length + state.spawns.length); setText($('score'), state.score);
-  setText($('best'), loadScores()[0] ? loadScores()[0].score : 0);
+  setText($('best'), bestScore);
   for (const b of towerButtons.children) { b.classList.toggle('selected', b.dataset.key === state.buildType); b.disabled = state.over; }
   setText($('pauseBtn'), state.paused ? 'Resume' : 'Pause');
   setText($('speedBtn'), 'Speed ' + state.speed + 'x');
@@ -358,10 +372,9 @@ function updateUI() {
 }
 
 /* ---------- Events ---------- */
-// Converts a mouse/touch position to a map square. The canvas can be scaled down by CSS on small screens, so scale back up first.
 const cellFromEvent = e => { const r = canvas.getBoundingClientRect(), k = canvas.width / r.width; return { c: Math.floor((e.clientX - r.left) * k / S), r: Math.floor((e.clientY - r.top) * k / S) }; };
 const towerAt = (c, r) => state.towers.find(t => t.c === c && t.r === r);
-let pointer = 'mouse';   // 'mouse', 'pen' or 'touch'. On a phone, building takes two taps: the first previews the square, the second builds.
+let pointer = 'mouse';
 canvas.addEventListener('pointerdown', e => { pointer = e.pointerType; });
 canvas.addEventListener('pointermove', e => { if (state && e.pointerType !== 'touch') state.mouse = cellFromEvent(e); });
 canvas.addEventListener('pointerleave', e => { if (state && e.pointerType !== 'touch') state.mouse = null; });
@@ -381,19 +394,19 @@ canvas.addEventListener('click', e => {
   state.gold -= def.cost; state.towers.push({ key: state.buildType, c, r, cooldown: 0, tiers: [0, 0], spent: def.cost });
   state.selectedTower = null; state.pending = null; if (touch) state.mouse = null; laneDirty = true; Sound.play('build'); setMessage(''); updateUI();
 });
-canvas.addEventListener('contextmenu', e => {   // right-click: sell the tower under the cursor, or cancel what you're holding
-  e.preventDefault(); if (pointer === 'touch') return;   // a long-press on a phone must never sell a tower
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault(); if (pointer === 'touch') return;
   const { c, r } = cellFromEvent(e), t = towerAt(c, r);
   if (t) sellTower(t); else if (state.buildType || state.selectedTower) { state.buildType = null; state.selectedTower = null; updateUI(); }
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && inGame && state && !state.over && !state.paused) togglePause(); });   // pause when you switch apps
+document.addEventListener('visibilitychange', () => { if (document.hidden && inGame && state && !state.over && !state.paused) togglePause(); });
 
 const togglePause = () => { if (state.over) return; state.paused = !state.paused; $('paused').hidden = !state.paused; Sound.setPaused(state.paused); updateUI(); };
 const cycleSpeed = () => { const o = SETTINGS.speedOptions; state.speed = o[(o.indexOf(state.speed) + 1) % o.length]; updateUI(); };
 const toggleAuto = () => { autoOn = !autoOn; if (autoOn && !state.waveActive && !state.over) state.autoAt = state.time + SETTINGS.autoStartDelay; if (!autoOn) state.autoAt = 0; updateUI(); };
 $('playBtn').onclick = () => startGame(pickMap());
 $('menuBtn').onclick = showMenu;
-$('restartBtn').onclick = () => newGame(SETTINGS.restartKeepsMap ? map.def : pickMap());   // restarts never touch the leaderboard
+$('restartBtn').onclick = () => newGame(SETTINGS.restartKeepsMap ? map.def : pickMap());
 $('pauseBtn').onclick = togglePause; $('speedBtn').onclick = cycleSpeed; $('autoChk').onchange = () => { toggleAuto(); $('autoChk').blur(); };
 $('musicBtn').onclick = () => { Sound.toggleMusic(); updateUI(); }; $('sfxBtn').onclick = () => { Sound.toggleSfx(); Sound.play('click'); updateUI(); };
 $('startBtn').onclick = () => startWave(false); $('sendBtn').onclick = () => startWave(true);
@@ -415,6 +428,8 @@ document.addEventListener('keydown', e => {
 function drawRange(x, y, r, col = 'rgba(255,255,255,0.12)') { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
 function draw() {
   ctx.drawImage(map.bg, 0, 0);
+  drawPortals();
+  drawBase();
   if (state.mouse && state.buildType && !state.over) {
     const { c, r } = state.mouse, def = TOWERS[state.buildType];
     if (c >= 0 && r >= 0 && c < COLS && r < ROWS) {
@@ -446,7 +461,7 @@ function draw() {
 let last = performance.now();
 function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.05); last = now;
-  if (inGame) { if (!state.paused && !state.over) for (let i = 0; i < state.speed; i++) update(dt); draw(); }
+  if (inGame) { if (!state.paused && !state.over) { for (let i = 0; i < state.speed; i++) update(dt); updateUI(); } draw(); }
   requestAnimationFrame(loop);
 }
 showMenu();

@@ -1,19 +1,13 @@
-/* =====================================================================
-   audio.js - placeholder 8-bit music and sound effects.
-   Everything is synthesized by the browser (Web Audio), so no audio files are needed.
-   To use real audio later, fill in AUDIO.files in config.js. Any name left as null keeps its beep.
-   Game code only uses: Sound.play('name'), Sound.startMusic(), Sound.stopMusic().
-   ===================================================================== */
+/* audio.js */
 const Sound = (() => {
-  let ac = null, sfxGain, musicGain, noiseBuf, timer = null, step = 0, nextTime = 0, fileMusic = null;
+  let ac = null, sfxGain, musicGain, noiseBuf, timer = null, step = 0, nextTime = 0;
   let musicOn = true, sfxOn = true, wantMusic = false, paused = false;
-  const last = {}, files = {}, failed = {};
+  const last = {};
 
   try { const s = JSON.parse(localStorage.getItem(AUDIO.storageKey)); if (s) { musicOn = s.music !== false; sfxOn = s.sfx !== false; } } catch (e) {}
   const save = () => { try { localStorage.setItem(AUDIO.storageKey, JSON.stringify({ music: musicOn, sfx: sfxOn })); } catch (e) {} };
   const hz = m => 440 * Math.pow(2, (m - 69) / 12);
 
-  /* Browsers only allow audio after a click or key press, so this runs on the first one. */
   function init() {
     if (ac) { if (ac.state === 'suspended' && !paused) ac.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
@@ -28,7 +22,6 @@ const Sound = (() => {
   ['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, init));
 
   function applyVolumes() {
-    if (fileMusic) fileMusic.volume = musicOn ? AUDIO.musicVolume : 0;
     if (!ac) return;
     sfxGain.gain.value = sfxOn ? AUDIO.sfxVolume : 0;
     musicGain.gain.value = musicOn ? AUDIO.musicVolume : 0;
@@ -50,7 +43,8 @@ const Sound = (() => {
   }
   const seq = (type, notes, dur, vol, gap) => notes.forEach((f, i) => tone(type, f, f, dur, vol, ac.currentTime + i * gap));
 
-  /* ---------- Sound effects (names match AUDIO.files in config.js) ---------- */
+  /* ---------- Sound effects ---------- */
+// Each effect is a short recipe: tone(waveform, startHz, endHz, seconds, volume). Edit the numbers to change a sound.
   const SFX = {
     shoot_basic:  () => tone('square', 700, 350, .07, .25),
     shoot_rapid:  () => tone('square', 1100, 800, .035, .15),
@@ -59,7 +53,7 @@ const Sound = (() => {
     shoot_cannon: () => { tone('square', 160, 50, .2, .3); noise(.15, .3, 600); },
     kill:     () => tone('square', 500, 900, .08, .2),
     bossDie:  () => { noise(.7, .6, 1500); tone('sawtooth', 300, 40, .7, .4); },
-    boss:     () => seq('sawtooth', [110, 110, 110], .22, .4, .25),   // boss wave warning
+    boss:     () => seq('sawtooth', [110, 110, 110], .22, .4, .25),
     build:    () => seq('square', [440, 660], .08, .25, .06),
     sell:     () => seq('square', [660, 440], .08, .25, .06),
     upgrade:  () => seq('square', [523, 659, 784, 1047], .09, .22, .06),
@@ -77,55 +71,38 @@ const Sound = (() => {
     const now = performance.now() / 1000;
     if (last[name] && now - last[name] < (THROTTLE[name] || 0)) return;
     last[name] = now;
-    const file = AUDIO.files[name];
-    if (file && !failed[name]) {
-      let a = files[name]; if (!a) a = files[name] = new Audio(AUDIO.folder + file);
-      const c = a.cloneNode(); c.volume = AUDIO.sfxVolume;
-      c.play().catch(() => { failed[name] = true; console.warn('Sound not found: ' + AUDIO.folder + file + ' (using placeholder)'); if (ac && SFX[name]) SFX[name](); });
-      return;
-    }
     if (ac && ac.state === 'running' && SFX[name]) SFX[name]();
   }
 
-  /* ---------- Music: a short looping 8-bit tune (bass, melody and drums), A minor ---------- */
-  const STEP = 60 / 132 / 2;                                   // one eighth note at 132 BPM
-  const BASS = [45, 41, 48, 43];                               // A, F, C, G (one per bar)
-  const BASS_PATTERN = [0, 0, 12, 0, 0, 0, 12, 0];             // root / octave jumps
+  /* ---------- Music ---------- */
+// Edit the note lists to change the tune (numbers are MIDI notes, 0 is a rest). The 132 in STEP is the tempo.
+  const STEP = 60 / 132 / 2;
+  const BASS = [45, 41, 48, 43];
+  const BASS_PATTERN = [0, 0, 12, 0, 0, 0, 12, 0];
   const LEAD = [[76, 0, 72, 0, 69, 0, 72, 76], [77, 0, 72, 0, 69, 0, 72, 77],
-                [79, 0, 76, 0, 72, 0, 76, 79], [79, 0, 74, 0, 71, 0, 74, 79]];   // 0 = rest
+                [79, 0, 76, 0, 72, 0, 76, 79], [79, 0, 74, 0, 71, 0, 74, 79]];
   function scheduleMusic() {
     while (nextTime < ac.currentTime + 0.25) {
       const bar = Math.floor(step / 8) % 4, i = step % 8, len = STEP * 0.9, bass = hz(BASS[bar] + BASS_PATTERN[i]);
       if (LEAD[bar][i]) tone('square', hz(LEAD[bar][i]), hz(LEAD[bar][i]), len, .09, nextTime, musicGain);
       tone('triangle', bass, bass, len, .22, nextTime, musicGain);
-      if (i % 2 === 1) noise(.03, .05, 8000, nextTime, musicGain);                 // hi-hat
-      if (i === 0 || i === 4) tone('sine', 150, 40, .12, .35, nextTime, musicGain); // kick
-      if (i === 2 || i === 6) noise(.08, .12, 4000, nextTime, musicGain);          // snare
+      if (i % 2 === 1) noise(.03, .05, 8000, nextTime, musicGain);
+      if (i === 0 || i === 4) tone('sine', 150, 40, .12, .35, nextTime, musicGain);
+      if (i === 2 || i === 6) noise(.08, .12, 4000, nextTime, musicGain);
       nextTime += STEP; step++;
     }
   }
   function startMusic() {
     wantMusic = true; if (!ac) return;
-    const f = AUDIO.files.music;
-    if (f && !failed.music) {
-      if (!fileMusic) {
-        fileMusic = new Audio(AUDIO.folder + f); fileMusic.loop = true;
-        fileMusic.onerror = () => { failed.music = true; fileMusic = null; console.warn('Music not found: ' + AUDIO.folder + f + ' (using placeholder)'); if (wantMusic) startMusic(); };
-      }
-      applyVolumes(); if (fileMusic.paused && !paused) fileMusic.play().catch(() => {});
-      return;
-    }
     if (timer) return;
     step = 0; nextTime = ac.currentTime + 0.1; timer = setInterval(scheduleMusic, 50);
   }
   function stopMusic() {
     wantMusic = false; clearInterval(timer); timer = null;
-    if (fileMusic) { fileMusic.pause(); fileMusic.currentTime = 0; }
   }
   function setPaused(p) {
     paused = p;
     if (ac) { if (p) ac.suspend(); else ac.resume(); }
-    if (fileMusic) { if (p) fileMusic.pause(); else if (wantMusic) fileMusic.play().catch(() => {}); }
   }
 
   return {

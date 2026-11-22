@@ -1,13 +1,11 @@
-/* =====================================================================
-   style.css - all design and interface styling.
-   Change the variables below to re-skin the whole game.
-   ===================================================================== */
+/* Edit the colors in :root below to re-skin the game. --neon-1, --neon-2 and --neon-3 are the neon colors.
+   --game-width and --game-height are set from config.js, so leave them. */
 :root {
   --page-bg: #1b1f2a; --panel-bg: #262c3b; --text: #e8ebf2; --muted: #98a1b8;
   --accent: #ffd166; --button-bg: #323a4f; --button-selected: #4a5778;
-  --game-width: 768px; --game-height: 576px;   /* set automatically from config.js */
+  --game-width: 768px; --game-height: 576px;
   --panel-width: 280px;
-  --neon-1: #00f0ff; --neon-2: #ff2bd6; --neon-3: #8a4dff;   /* neon colors: cyan, magenta, purple */
+  --neon-1: #00f0ff; --neon-2: #ff2bd6; --neon-3: #8a4dff;
 }
 html { background: var(--page-bg); }
 * { box-sizing: border-box; }
@@ -35,7 +33,7 @@ input { font: inherit; padding: 8px; border-radius: 4px; border: 2px solid var(-
 #menuMain { width: 340px; max-width: 100%; text-align: center; }
 #menuBoard { width: 460px; max-width: 100%; }
 
-/* Game layout: fixed sizes, so the window never grows or shrinks with the side text */
+/* Game layout */
 #bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%; max-width: calc(var(--game-width) + var(--panel-width) + 12px); }
 #bar .spacer { flex: 1; }
 #game { display: grid; grid-template-columns: minmax(0, 1fr) var(--panel-width); gap: 12px; width: 100%; max-width: calc(var(--game-width) + var(--panel-width) + 12px); }
@@ -46,6 +44,7 @@ canvas { display: block; width: 100%; height: 100%; background: #000; border-rad
 .stat { background: var(--button-bg); padding: 5px 7px; border-radius: 4px; font-size: .75rem; color: var(--muted); }
 .stat b { display: block; font-size: 1rem; color: var(--accent); }
 #towerButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.towerIcon { float: left; width: 32px; height: 32px; margin-right: 8px; image-rendering: pixelated; }
 .swatch { display: inline-block; width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px; background: var(--c); }
 #upgradeBox { background: var(--button-bg); border-radius: 4px; padding: 8px; height: 132px; display: flex; flex-direction: column; gap: 6px; flex: none; }
 #upgradeBox button { background: var(--panel-bg); min-height: 32px; }
@@ -66,7 +65,7 @@ canvas { display: block; width: 100%; height: 100%; background: #000; border-rad
 .toggle input:checked + .track::after { transform: translateX(16px); background: var(--accent); }
 .toggle input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Info strip under the game: next wave, messages, key hints */
+/* Info strip under the game */
 #infoBar { display: flex; gap: 16px; align-items: flex-start; width: 100%; max-width: calc(var(--game-width) + var(--panel-width) + 12px); background: var(--panel-bg); border-radius: 6px; padding: 10px 12px; }
 #infoBar #preview { flex: 1.3; min-height: 0; }
 #infoBar #message { flex: 1; height: auto; min-height: 2.6em; }
@@ -84,19 +83,14 @@ table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--button-bg); }
 th { position: sticky; top: 0; background: var(--panel-bg); color: var(--muted); font-weight: 600; }
 
-/* =====================================================================
-   Touch and phone support
-   - Wide screens: map on the left, panel on the right (the map shrinks to fit).
-   - Narrow screens (phones in portrait): everything stacks in one column, map first.
-   ===================================================================== */
-body { touch-action: manipulation; }   /* no double-tap zoom delay; pinch zoom still works */
+/* Touch and phone support */
+body { touch-action: manipulation; }
 canvas, button, .toggle, .stat { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 #toast { display: none; position: absolute; left: 50%; transform: translateX(-50%); bottom: 6px; width: max-content; max-width: calc(100% - 16px); padding: 3px 8px; background: rgba(10,12,18,.75); color: var(--accent); border-radius: 4px; font-size: .75rem; text-align: center; pointer-events: none; }
 
-@media (pointer: coarse) { button, .toggle { min-height: 44px; } }   /* finger-sized tap targets */
-@media (hover: none) { .keys { display: none; } }                    /* keyboard hints are useless on a phone */
+@media (pointer: coarse) { button, .toggle { min-height: 44px; } }
+@media (hover: none) { .keys { display: none; } }
 
-/* Messages show on top of the map when the info strip would be off-screen */
 @media (max-width: 719px), (max-height: 520px) {
   #toast.show { display: block; }
   #infoBar #message { display: none; }
@@ -113,7 +107,6 @@ canvas, button, .toggle, .stat { -webkit-tap-highlight-color: transparent; -webk
   #bar .spacer { display: none; }
   #bar button { flex: 1; padding: 6px 4px; font-size: .8rem; text-align: center; }
 
-  /* Flatten the layout so the pieces can be re-ordered: stats, map, wave preview, towers, upgrades, wave buttons */
   #game, #panel { display: contents; }
   #bar { order: 0; } #stats { order: 1; } #stage { order: 2; align-self: stretch; } #infoBar { order: 3; }
   #towerButtons { order: 4; } #upgradeBox { order: 5; } #startBtn { order: 6; } #sendBtn { order: 7; } .toggle { order: 8; } #boardWrap { order: 9; }
@@ -126,17 +119,15 @@ canvas, button, .toggle, .stat { -webkit-tap-highlight-color: transparent; -webk
   #upgradeBox { height: auto; min-height: 60px; }
   #infoBar { padding: 8px; }
   #preview { min-height: 0; }
-  #modal { position: fixed; z-index: 50; border-radius: 0; }   /* game-over box centers on the whole screen */
+  #modal { position: fixed; z-index: 50; border-radius: 0; }
   #modalBox { width: min(300px, 90vw); }
   #boardScroll { height: 200px; }
   th, td { padding: 4px 5px; font-size: .8rem; }
 }
 
-/* =====================================================================
-   Neon lighting
-   Colors are --neon-1/2/3 at the top of this file. Delete this whole block to remove the effect.
-   ===================================================================== */
-body::before {   /* soft colored light drifting slowly behind everything */
+/* Neon lighting */
+/* Lower the .28, .26 and .14 numbers in body::before for dimmer background light. Delete this whole section to remove the effect. The background light only moves on computers, to save phone batteries. */
+body::before {
   content: ''; position: fixed; inset: -25%; z-index: -1; pointer-events: none;
   background:
     radial-gradient(40% 35% at 20% 25%, rgba(0, 240, 255, .28), transparent 70%),
@@ -153,4 +144,4 @@ canvas { box-shadow: 0 0 0 2px rgba(0, 240, 255, .55), 0 0 22px rgba(0, 240, 255
 #panel, #infoBar, .card { box-shadow: 0 0 0 1px rgba(138, 77, 255, .45), 0 0 18px rgba(138, 77, 255, .25); }
 h1 { text-shadow: 0 0 8px var(--neon-1), 0 0 22px var(--neon-2); }
 button.big { box-shadow: 0 0 14px rgba(255, 209, 102, .55); }
-@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+@media (prefers-reduced-motion: reduce), (pointer: coarse) { body::before { animation: none; } }

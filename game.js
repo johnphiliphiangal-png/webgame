@@ -4,7 +4,9 @@ document.documentElement.style.setProperty('--game-width', COLS * S + 'px');
 document.documentElement.style.setProperty('--game-height', ROWS * S + 'px');
 document.documentElement.style.setProperty('--game-aspect', COLS + ' / ' + ROWS);
 const canvas = $('canvas'), ctx = canvas.getContext('2d');
+const menuPreviewCanvas = $('menuMapPreview'), menuPreviewCtx = menuPreviewCanvas.getContext('2d');
 canvas.width = COLS * S; canvas.height = ROWS * S;
+menuPreviewCanvas.width = COLS * S; menuPreviewCanvas.height = ROWS * S;
 document.title = SETTINGS.gameTitle; $('title').textContent = SETTINGS.gameTitle;
 
 const key = (c, r) => c + ',' + r;
@@ -18,7 +20,7 @@ const setMessage = t => {
 const hash = (c, r, k, sd) => { const x = Math.sin(c * 127.1 + r * 311.7 + k * 74.7 + sd * 13.3) * 43758.5453; return x - Math.floor(x); };
 const center = k => { const [c, r] = parse(k); return [c * S + S / 2, r * S + S / 2]; };
 
-let map, state, plans = {}, danger = new Map(), load = new Map(), laneDirty = true;
+let map, state, menuPreviewMap = null, plans = {}, danger = new Map(), load = new Map(), laneDirty = true;
 let inGame = false, autoOn = false, lastMapName = null, memScores = [];
 
 /* ---------- Leaderboard ---------- */
@@ -89,20 +91,32 @@ function bakeMap(m) {
   }
   return bg;
 }
-function drawPortals() {
-  map.entries.forEach((k, i) => {
+function drawPortals(targetCtx = ctx, targetMap = map) {
+  targetMap.entries.forEach((k, i) => {
     const [x, y] = center(k);
-    if (drawSprite(ctx, 'other', 'portal' + (i % 3 + 1), x - S / 2, y - S / 2, S, S)) return;
-    ctx.fillStyle = PALETTE.entrances[i % 3]; ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(x, y, 12, 0, 7); ctx.fill(); ctx.stroke(); ctx.lineWidth = 1;
-    ctx.fillStyle = '#222'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(i + 1, x, y + 1);
+    if (drawSprite(targetCtx, 'other', 'portal' + (i % 3 + 1), x - S / 2, y - S / 2, S, S)) return;
+    targetCtx.fillStyle = PALETTE.entrances[i % 3]; targetCtx.strokeStyle = '#222'; targetCtx.lineWidth = 2;
+    targetCtx.beginPath(); targetCtx.arc(x, y, 12, 0, 7); targetCtx.fill(); targetCtx.stroke(); targetCtx.lineWidth = 1;
+    targetCtx.fillStyle = '#222'; targetCtx.font = 'bold 13px sans-serif'; targetCtx.textAlign = 'center'; targetCtx.textBaseline = 'middle'; targetCtx.fillText(i + 1, x, y + 1);
   });
 }
-function drawBase() {
-  const [ex, ey] = center(map.exit);
-  if (drawSprite(ctx, 'other', 'base', ex - S / 2, ey - S / 2, S, S)) return;
-  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#222'; ctx.fillRect(ex - 12, ey - 12, 24, 24); ctx.strokeRect(ex - 12, ey - 12, 24, 24);
-  ctx.fillStyle = '#222'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('EXIT', ex, ey + 1);
+function drawBase(targetCtx = ctx, targetMap = map) {
+  const [ex, ey] = center(targetMap.exit);
+  if (drawSprite(targetCtx, 'other', 'base', ex - S / 2, ey - S / 2, S, S)) return;
+  targetCtx.fillStyle = '#fff'; targetCtx.strokeStyle = '#222'; targetCtx.fillRect(ex - 12, ey - 12, 24, 24); targetCtx.strokeRect(ex - 12, ey - 12, 24, 24);
+  targetCtx.fillStyle = '#222'; targetCtx.font = 'bold 10px sans-serif'; targetCtx.textAlign = 'center'; targetCtx.textBaseline = 'middle'; targetCtx.fillText('EXIT', ex, ey + 1);
+}
+function renderMenuPreview() {
+  const def = MAPS.find(m => m.name === SETTINGS.mapSelection) || MAPS[0];
+  if (!menuPreviewMap || menuPreviewMap.def !== def) menuPreviewMap = buildMap(def);
+  menuPreviewCtx.clearRect(0, 0, menuPreviewCanvas.width, menuPreviewCanvas.height);
+  menuPreviewCtx.imageSmoothingEnabled = false;
+  menuPreviewCtx.drawImage(menuPreviewMap.bg, 0, 0);
+  drawPortals(menuPreviewCtx, menuPreviewMap);
+  drawBase(menuPreviewCtx, menuPreviewMap);
+  const label = (SETTINGS.mapSelection === 'random' ? 'Sample map · ' : 'Map preview · ') + def.name;
+  setText($('menuMapName'), label);
+  menuPreviewCanvas.setAttribute('aria-label', label);
 }
 function pickMap() {
   if (SETTINGS.mapSelection !== 'random') { const f = MAPS.find(m => m.name === SETTINGS.mapSelection); if (f) return f; }
@@ -177,7 +191,12 @@ function newGame(def) {
   renderPreview(); updateUI();
 }
 function startGame(def) { inGame = true; $('menu').hidden = true; $('gameView').hidden = false; newGame(def); }
-function showMenu() { inGame = false; $('menu').hidden = false; $('gameView').hidden = true; Sound.setPaused(false); Sound.stopMusic(); renderBoards(); }
+function showMenuPage(page) {
+  $('menuHome').hidden = page !== 'home';
+  $('settingsPage').hidden = page !== 'settings';
+  $('aboutPage').hidden = page !== 'about';
+}
+function showMenu() { inGame = false; $('menu').hidden = false; $('gameView').hidden = true; showMenuPage('home'); Sound.setPaused(false); Sound.stopMusic(); Sound.startMenuMusic(); Sound.init(); renderBoards(); }
 
 function startWave(early) {
   if (state.over) return;
@@ -325,7 +344,7 @@ function refreshTowerIcons() {
 }
 refreshTowerIcons();
 function selectBuild(k) { if (state.over) return; Sound.play('click'); state.buildType = state.buildType === k ? null : k; state.selectedTower = null; if (!state.buildType) { state.pending = null; state.mouse = null; } updateUI(); }
-function spriteLoaded() { refreshTowerIcons(); if (inGame && state) renderPreview(); }
+function spriteLoaded() { refreshTowerIcons(); renderMenuPreview(); if (inGame && state) renderPreview(); }
 function renderPreview() {
   const box = $('preview'); box.innerHTML = '';
   const n = state.wave, k = Math.max(0, n - WAVES.length + 1), head = document.createElement('div');
@@ -371,6 +390,21 @@ function updateUI() {
   if (t) setText($('sellBtn'), `Sell ${TOWERS[t.key].name} - ${sellValue(t)} gold`);
 }
 
+[['musicVolume', 'musicVolumeValue', Sound.musicVolume, Sound.setMusicVolume],
+ ['sfxVolume', 'sfxVolumeValue', Sound.sfxVolume, Sound.setSfxVolume]].forEach(([inputId, outputId, initial, setVolume]) => {
+  const input = $(inputId), output = $(outputId);
+  input.value = Math.round(initial * 100);
+  const updateVolumeLabel = () => {
+    setText(output, input.value + '%');
+    input.style.setProperty('--range-progress', input.value + '%');
+  };
+  updateVolumeLabel();
+  input.addEventListener('input', () => {
+    updateVolumeLabel();
+    setVolume(Number(input.value) / 100);
+  });
+});
+
 /* ---------- Events ---------- */
 const cellFromEvent = e => { const r = canvas.getBoundingClientRect(), k = canvas.width / r.width; return { c: Math.floor((e.clientX - r.left) * k / S), r: Math.floor((e.clientY - r.top) * k / S) }; };
 const towerAt = (c, r) => state.towers.find(t => t.c === c && t.r === r);
@@ -396,8 +430,7 @@ canvas.addEventListener('click', e => {
 });
 canvas.addEventListener('contextmenu', e => {
   e.preventDefault(); if (pointer === 'touch') return;
-  const { c, r } = cellFromEvent(e), t = towerAt(c, r);
-  if (t) sellTower(t); else if (state.buildType || state.selectedTower) { state.buildType = null; state.selectedTower = null; updateUI(); }
+  if (state.buildType || state.selectedTower) { state.buildType = null; state.selectedTower = null; updateUI(); }
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && inGame && state && !state.over && !state.paused) togglePause(); });
 
@@ -406,6 +439,9 @@ const cycleSpeed = () => { const o = SETTINGS.speedOptions; state.speed = o[(o.i
 const toggleAuto = () => { autoOn = !autoOn; if (autoOn && !state.waveActive && !state.over) state.autoAt = state.time + SETTINGS.autoStartDelay; if (!autoOn) state.autoAt = 0; updateUI(); };
 $('playBtn').onclick = () => startGame(pickMap());
 $('menuBtn').onclick = showMenu;
+$('settingsBtn').onclick = () => showMenuPage('settings');
+$('aboutBtn').onclick = () => showMenuPage('about');
+document.querySelectorAll('.menu-back').forEach(button => { button.onclick = () => showMenuPage('home'); });
 $('restartBtn').onclick = () => newGame(SETTINGS.restartKeepsMap ? map.def : pickMap());
 $('pauseBtn').onclick = togglePause; $('speedBtn').onclick = cycleSpeed; $('autoChk').onchange = () => { toggleAuto(); $('autoChk').blur(); };
 $('musicBtn').onclick = () => { Sound.toggleMusic(); updateUI(); }; $('sfxBtn').onclick = () => { Sound.toggleSfx(); Sound.play('click'); updateUI(); };
@@ -465,4 +501,5 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 showMenu();
+renderMenuPreview();
 requestAnimationFrame(loop);

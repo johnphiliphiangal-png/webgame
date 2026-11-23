@@ -9,15 +9,49 @@
 <body>
 <!-- START MENU -->
 <section id="menu" class="screen">
-  <div id="menuMain" class="card">
-    <h1 id="title"></h1>
-    <p class="muted">Stop the enemies before they reach the exit.</p>
-    <button id="playBtn" class="big">Play</button>
+  <div class="menu-layout">
+    <main id="menuMain" class="menu-card">
+      <div id="menuHome">
+        <div class="menu-emblem" aria-hidden="true">✦</div>
+        <h1 id="title"></h1>
+        <p class="menu-tagline">Build. Defend. Survive.</p>
+        <button id="playBtn" class="menu-play"><span aria-hidden="true">▶</span> Play</button>
+        <div class="menu-actions">
+          <button id="settingsBtn" class="menu-secondary"><span aria-hidden="true">⚙</span> Settings</button>
+          <button id="aboutBtn" class="menu-secondary"><span aria-hidden="true">ⓘ</span> About</button>
+        </div>
+      </div>
+      <section id="settingsPage" class="menu-page" hidden>
+        <h2>Settings</h2>
+        <label class="volume-control" for="musicVolume">
+          <span>Music volume <output id="musicVolumeValue"></output></span>
+          <input id="musicVolume" type="range" min="0" max="100" step="1">
+        </label>
+        <label class="volume-control" for="sfxVolume">
+          <span>Sound effects <output id="sfxVolumeValue"></output></span>
+          <input id="sfxVolume" type="range" min="0" max="100" step="1">
+        </label>
+        <button class="menu-back" type="button">Back</button>
+      </section>
+      <section id="aboutPage" class="menu-page" hidden>
+        <h2>About the game</h2>
+        <p>Build towers on open ground and upgrade them to stop enemies along branching routes. Earn gold, protect your lives, and see how many waves you can survive.</p>
+        <p>Choose from five tower types, each with its own strengths. Some enemies fly, and later waves bring tougher foes.</p>
+        <button class="menu-back" type="button">Back</button>
+      </section>
+    </main>
+    <aside id="menuFeature" class="menu-card">
+      <div class="menu-map">
+        <canvas id="menuMapPreview" width="768" height="576" role="img" aria-label="Sample game map"></canvas>
+      </div>
+      <div id="menuMapName" class="menu-map-name"></div>
+      <p>Defend your base from wave after wave!</p>
+    </aside>
+    <aside id="menuBoard" class="menu-card">
+      <h2>Top 10</h2>
+      <table><thead><tr><th>#</th><th>Name</th><th>Wave</th><th>Score</th><th>Map</th></tr></thead><tbody id="menuBody"></tbody></table>
+    </aside>
   </div>
-  <aside id="menuBoard" class="card">
-    <h2>Top 10</h2>
-    <table><thead><tr><th>#</th><th>Name</th><th>Wave</th><th>Score</th><th>Map</th></tr></thead><tbody id="menuBody"></tbody></table>
-  </aside>
 </section>
 
 <!-- GAME -->

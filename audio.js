@@ -1,11 +1,19 @@
-/* audio.js */
 const Sound = (() => {
   let ac = null, sfxGain, musicGain, noiseBuf, timer = null, step = 0, nextTime = 0;
-  let musicOn = true, sfxOn = true, wantMusic = false, paused = false;
+  let musicOn = true, sfxOn = true, musicVolume = AUDIO.musicVolume, sfxVolume = AUDIO.sfxVolume;
+  let wantMusic = false, paused = false, musicMode = 'game';
   const last = {};
 
-  try { const s = JSON.parse(localStorage.getItem(AUDIO.storageKey)); if (s) { musicOn = s.music !== false; sfxOn = s.sfx !== false; } } catch (e) {}
-  const save = () => { try { localStorage.setItem(AUDIO.storageKey, JSON.stringify({ music: musicOn, sfx: sfxOn })); } catch (e) {} };
+  const clampVolume = value => Math.max(0, Math.min(1, value));
+  try {
+    const s = JSON.parse(localStorage.getItem(AUDIO.storageKey));
+    if (s) {
+      musicOn = s.music !== false; sfxOn = s.sfx !== false;
+      if (Number.isFinite(s.musicVolume)) musicVolume = clampVolume(s.musicVolume);
+      if (Number.isFinite(s.sfxVolume)) sfxVolume = clampVolume(s.sfxVolume);
+    }
+  } catch (e) {}
+  const save = () => { try { localStorage.setItem(AUDIO.storageKey, JSON.stringify({ music: musicOn, sfx: sfxOn, musicVolume, sfxVolume })); } catch (e) {} };
   const hz = m => 440 * Math.pow(2, (m - 69) / 12);
 
   function init() {
@@ -17,14 +25,14 @@ const Sound = (() => {
     noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     applyVolumes();
-    if (wantMusic) startMusic();
+    if (wantMusic) startTrack(musicMode);
   }
   ['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, init));
 
   function applyVolumes() {
     if (!ac) return;
-    sfxGain.gain.value = sfxOn ? AUDIO.sfxVolume : 0;
-    musicGain.gain.value = musicOn ? AUDIO.musicVolume : 0;
+    sfxGain.gain.value = sfxOn ? sfxVolume : 0;
+    musicGain.gain.value = musicOn ? musicVolume : 0;
   }
 
   /* ---------- Synth building blocks ---------- */
@@ -81,6 +89,10 @@ const Sound = (() => {
   const BASS_PATTERN = [0, 0, 12, 0, 0, 0, 12, 0];
   const LEAD = [[76, 0, 72, 0, 69, 0, 72, 76], [77, 0, 72, 0, 69, 0, 72, 77],
                 [79, 0, 76, 0, 72, 0, 76, 79], [79, 0, 74, 0, 71, 0, 74, 79]];
+  const MENU_STEP = 60 / 84 / 2;
+  const MENU_BASS = [50, 46, 48, 43];
+  const MENU_LEAD = [[74, 0, 69, 0, 72, 0, 67, 0], [69, 0, 65, 0, 67, 0, 62, 0],
+                     [72, 0, 69, 0, 74, 0, 72, 0], [67, 0, 65, 0, 62, 0, 0, 0]];
   function scheduleMusic() {
     while (nextTime < ac.currentTime + 0.25) {
       const bar = Math.floor(step / 8) % 4, i = step % 8, len = STEP * 0.9, bass = hz(BASS[bar] + BASS_PATTERN[i]);
@@ -92,11 +104,29 @@ const Sound = (() => {
       nextTime += STEP; step++;
     }
   }
-  function startMusic() {
-    wantMusic = true; if (!ac) return;
-    if (timer) return;
-    step = 0; nextTime = ac.currentTime + 0.1; timer = setInterval(scheduleMusic, 50);
+  function scheduleMenuMusic() {
+    while (nextTime < ac.currentTime + 0.25) {
+      const bar = Math.floor(step / 8) % 4, i = step % 8, when = nextTime;
+      const root = MENU_BASS[bar], note = MENU_LEAD[bar][i];
+      if (i === 0 || i === 4) tone('triangle', hz(root), hz(root), MENU_STEP * 1.65, .1, when, musicGain);
+      if (note) tone('square', hz(note), hz(note), MENU_STEP * .78, .055, when, musicGain);
+      if (i === 2 || i === 6) tone('square', hz(root + 7), hz(root + 7), MENU_STEP * .45, .022, when, musicGain);
+      nextTime += MENU_STEP; step++;
+    }
   }
+  function startTrack(mode) {
+    wantMusic = true;
+    if (musicMode !== mode) {
+      musicMode = mode;
+      clearInterval(timer); timer = null;
+    }
+    if (!ac) return;
+    if (timer) return;
+    step = 0; nextTime = ac.currentTime + 0.1;
+    timer = setInterval(musicMode === 'menu' ? scheduleMenuMusic : scheduleMusic, 50);
+  }
+  function startMusic() { startTrack('game'); }
+  function startMenuMusic() { startTrack('menu'); }
   function stopMusic() {
     wantMusic = false; clearInterval(timer); timer = null;
   }
@@ -106,9 +136,12 @@ const Sound = (() => {
   }
 
   return {
-    init, play, startMusic, stopMusic, setPaused,
+    init, play, startMusic, startMenuMusic, stopMusic, setPaused,
     toggleMusic() { musicOn = !musicOn; save(); applyVolumes(); },
     toggleSfx() { sfxOn = !sfxOn; save(); applyVolumes(); },
+    setMusicVolume(value) { musicVolume = clampVolume(value); save(); applyVolumes(); },
+    setSfxVolume(value) { sfxVolume = clampVolume(value); save(); applyVolumes(); },
     get musicOn() { return musicOn; }, get sfxOn() { return sfxOn; },
+    get musicVolume() { return musicVolume; }, get sfxVolume() { return sfxVolume; },
   };
 })();

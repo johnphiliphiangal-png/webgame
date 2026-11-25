@@ -1,108 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tower Defense</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tower Defense</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<!-- START MENU -->
-<section id="menu" class="screen">
-  <div class="menu-layout">
-    <main id="menuMain" class="menu-card">
-      <div id="menuHome">
-        <div class="menu-emblem" aria-hidden="true">✦</div>
-        <h1 id="title"></h1>
-        <p class="menu-tagline">Build. Defend. Survive.</p>
-        <button id="playBtn" class="menu-play"><span aria-hidden="true">▶</span> Play</button>
-        <div class="menu-actions">
-          <button id="settingsBtn" class="menu-secondary"><span aria-hidden="true">⚙</span> Settings</button>
-          <button id="aboutBtn" class="menu-secondary"><span aria-hidden="true">ⓘ</span> About</button>
-        </div>
-      </div>
-      <section id="settingsPage" class="menu-page" hidden>
-        <h2>Settings</h2>
-        <label class="volume-control" for="musicVolume">
-          <span>Music volume <output id="musicVolumeValue"></output></span>
-          <input id="musicVolume" type="range" min="0" max="100" step="1">
-        </label>
-        <label class="volume-control" for="sfxVolume">
-          <span>Sound effects <output id="sfxVolumeValue"></output></span>
-          <input id="sfxVolume" type="range" min="0" max="100" step="1">
-        </label>
-        <button class="menu-back" type="button">Back</button>
-      </section>
-      <section id="aboutPage" class="menu-page" hidden>
-        <h2>About the game</h2>
-        <p>Build towers on open ground and upgrade them to stop enemies along branching routes. Earn gold, protect your lives, and see how many waves you can survive.</p>
-        <p>Choose from five tower types, each with its own strengths. Some enemies fly, and later waves bring tougher foes.</p>
-        <button class="menu-back" type="button">Back</button>
-      </section>
-    </main>
-    <aside id="menuFeature" class="menu-card">
-      <div class="menu-map">
-        <canvas id="menuMapPreview" width="768" height="576" role="img" aria-label="Sample game map"></canvas>
-      </div>
-      <div id="menuMapName" class="menu-map-name"></div>
-      <p>Defend your base from wave after wave!</p>
-    </aside>
-    <aside id="menuBoard" class="menu-card">
-      <h2>Top 10</h2>
-      <table><thead><tr><th>#</th><th>Name</th><th>Wave</th><th>Score</th><th>Map</th></tr></thead><tbody id="menuBody"></tbody></table>
-    </aside>
-  </div>
-</section>
 
-<!-- GAME -->
-<section id="gameView" class="screen" hidden>
-  <div id="bar">
-    <b id="mapName"></b><span class="spacer"></span>
-    <button id="pauseBtn"></button><button id="speedBtn"></button><button id="musicBtn"></button><button id="sfxBtn"></button>
-    <button id="restartBtn">Restart</button><button id="menuBtn">Menu</button>
-  </div>
-  <div id="game">
-    <div id="stage">
-      <canvas id="canvas"></canvas>
-      <div id="toast"></div>
-      <div id="paused" class="overlay" hidden>Paused</div>
-      <div id="modal" class="overlay" hidden>
-        <div id="modalBox">
-          <h2>Game over</h2>
-          <p id="modalText"></p>
-          <input id="nameInput" maxlength="16" placeholder="Your username" autocomplete="off">
-          <button id="saveBtn">Save score and play again</button>
-          <button id="skipBtn">Play again without saving</button>
+  <!-- START MENU -->
+  <section id="menu" class="screen">
+    <div class="menu-layout">
+
+      <main id="menuMain" class="menu-card">
+        <div id="menuHome">
+          <div class="menu-emblem" aria-hidden="true">✦</div>
+          <h1 id="title"></h1>
+          <p class="menu-tagline">Build. Defend. Survive.</p>
+          <button id="playBtn" class="menu-play"><span aria-hidden="true">▶</span> Play</button>
+          <div class="menu-actions">
+            <button id="settingsBtn" class="menu-secondary"><span aria-hidden="true">⚙</span> Settings</button>
+            <button id="aboutBtn" class="menu-secondary"><span aria-hidden="true">ⓘ</span> About</button>
+          </div>
+        </div>
+
+        <section id="settingsPage" class="menu-page" hidden>
+          <h2>Settings</h2>
+          <label class="volume-control" for="musicVolume">
+            <span>Music volume <output id="musicVolumeValue"></output></span>
+            <input id="musicVolume" type="range" min="0" max="100" step="1">
+          </label>
+          <label class="volume-control" for="sfxVolume">
+            <span>Sound effects <output id="sfxVolumeValue"></output></span>
+            <input id="sfxVolume" type="range" min="0" max="100" step="1">
+          </label>
+          <button class="menu-back" type="button">Back</button>
+        </section>
+
+        <section id="aboutPage" class="menu-page" hidden>
+          <h2>About the game</h2>
+          <p>Build towers on open ground and upgrade them to stop enemies along branching routes. Earn gold, protect your lives, and see how many waves you can survive.</p>
+          <p>Choose from five tower types, each with its own strengths. Some enemies fly, and later waves bring tougher foes.</p>
+          <button class="menu-back" type="button">Back</button>
+        </section>
+      </main>
+
+      <aside id="menuFeature" class="menu-card">
+        <div class="menu-map">
+          <canvas id="menuMapPreview" width="768" height="576" role="img" aria-label="Sample game map"></canvas>
+        </div>
+        <div id="menuMapName" class="menu-map-name"></div>
+        <p>Defend your base from wave after wave!</p>
+      </aside>
+
+      <aside id="menuBoard" class="menu-card">
+        <h2>Top 10</h2>
+        <table>
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Wave</th><th>Score</th><th>Map</th></tr>
+          </thead>
+          <tbody id="menuBody"></tbody>
+        </table>
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section id="gameView" class="screen" hidden>
+
+    <div id="bar">
+      <b id="mapName"></b>
+      <span class="spacer"></span>
+      <button id="pauseBtn"></button>
+      <button id="speedBtn"></button>
+      <button id="musicBtn"></button>
+      <button id="sfxBtn"></button>
+      <button id="restartBtn">Restart</button>
+      <button id="menuBtn">Menu</button>
+    </div>
+
+    <div id="game">
+      <div id="stage">
+        <canvas id="canvas"></canvas>
+        <div id="toast"></div>
+        <div id="paused" class="overlay" hidden>Paused</div>
+        <div id="modal" class="overlay" hidden>
+          <div id="modalBox">
+            <h2>Game over</h2>
+            <p id="modalText"></p>
+            <input id="nameInput" maxlength="16" placeholder="Your username" autocomplete="off">
+            <button id="saveBtn">Save score and play again</button>
+            <button id="skipBtn">Play again without saving</button>
+          </div>
         </div>
       </div>
-    </div>
-    <div id="panel">
-      <div id="stats">
-        <div class="stat">Gold<b id="gold"></b></div><div class="stat">Lives<b id="lives"></b></div><div class="stat">Wave<b id="wave"></b></div>
-        <div class="stat">Enemies<b id="enemies"></b></div><div class="stat">Score<b id="score"></b></div><div class="stat">Best<b id="best"></b></div>
+
+      <div id="panel">
+        <div id="stats">
+          <div class="stat">Gold<b id="gold"></b></div>
+          <div class="stat">Lives<b id="lives"></b></div>
+          <div class="stat">Wave<b id="wave"></b></div>
+          <div class="stat">Enemies<b id="enemies"></b></div>
+          <div class="stat">Score<b id="score"></b></div>
+          <div class="stat">Best<b id="best"></b></div>
+        </div>
+        <div id="towerButtons"></div>
+        <div id="upgradeBox">
+          <div id="upTitle" class="small">Click a tower on the map to upgrade it.</div>
+          <button id="upA"></button>
+          <button id="upB"></button>
+          <button id="sellBtn"></button>
+        </div>
+        <button id="startBtn"></button>
+        <button id="sendBtn"></button>
+        <label class="toggle"><input type="checkbox" id="autoChk"><span class="track"></span>Auto-start waves</label>
       </div>
-      <div id="towerButtons"></div>
-      <div id="upgradeBox">
-        <div id="upTitle" class="small">Click a tower on the map to upgrade it.</div>
-        <button id="upA"></button><button id="upB"></button><button id="sellBtn"></button>
-      </div>
-      <button id="startBtn"></button>
-      <button id="sendBtn"></button>
-      <label class="toggle"><input type="checkbox" id="autoChk"><span class="track"></span>Auto-start waves</label>
     </div>
-  </div>
-  <div id="infoBar">
-    <div id="preview"></div>
-    <div id="message"></div>
-    <div class="small keys">Keys: 1-5 tower, Q/W upgrade, X sell, Space wave, P pause, F speed, A auto, Esc cancel</div>
-  </div>
-  <div id="boardWrap" class="card">
-    <h2>Leaderboard (top 50)</h2>
-    <div id="boardScroll"><table><thead><tr><th>#</th><th>Name</th><th>Wave</th><th>Score</th><th>Map</th></tr></thead><tbody id="boardBody"></tbody></table></div>
-  </div>
-</section>
-<script src="config.js"></script>
-<script src="audio.js"></script>
-<script src="game.js"></script>
+
+    <div id="infoBar">
+      <div id="preview"></div>
+      <div id="message"></div>
+      <div class="small keys">Keys: 1-5 tower, Q/W upgrade, X sell, Space wave, P pause, F speed, A auto, Esc cancel</div>
+    </div>
+
+    <div id="boardWrap" class="card">
+      <h2>Leaderboard (top 50)</h2>
+      <div id="boardScroll">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Wave</th><th>Score</th><th>Map</th></tr>
+          </thead>
+          <tbody id="boardBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+  <script src="config.js"></script>
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>
